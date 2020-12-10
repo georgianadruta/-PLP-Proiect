@@ -29,3 +29,5 @@ Definition update (env : Env) (s : string) (x : nat) : Env :=
   fun y => if (eqb y s)
               then x
               else (env y).
+              
+ Check env.
