@@ -1,4 +1,4 @@
-Scopul proiectului este proiectarea și implementarea limbajului de programare C++ cu următoarele funcționalități:
+Scopul proiectului este proiectarea și implementarea limbajului de programare C cu următoarele funcționalități:
 - operații cu expresii aritmetice;
 - implementarea tipurilor de date int, bool, char, float;
 - atribuiri;
