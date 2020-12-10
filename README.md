@@ -4,6 +4,7 @@ Scopul proiectului este proiectarea și implementarea limbajului de programare C
 - atribuiri;
 - instrucțiuni condiționale (if cu una sau 2 ramuri);
 - instrucțiuni repetitive.
+
 Funcționalități netriviale:
 - funcții și apeluri de funcții;
 - funcții recursive;
