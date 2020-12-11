@@ -64,20 +64,61 @@ Inductive aeval : AExp -> Env -> nat -> Prop :=
     a2 =[ sigma ]=> i2 ->
     n = Nat.modulo i1 i2 ->
     a1 %' a2 =[sigma]=> n
-
 where "a =[ sigma ]=> n" := (aeval a sigma n).
 
 Hint Constructors aeval.
 
-(* Fixpoint aeval (a : AExp) (env : Env) : nat :=
-  match a with
-  | anum n' => n'
-  | astring s' => s'
-  | aplus a1 a2 => (aeval a1 env) + (aeval a2 env)
-  | aminus a1 a2 => (aeval a1 env) + (aeval a2 env)
-  | amul a1 a2 => (aeval a1 env) * (aeval a2 env)
-  | adiv a1 a2 => Nat.div (aeval a1 env) (aeval a2 env)
-  | amod a1 a2 => Nat.modulo (aeval a1 env) (aeval a2 env)
-  end. *)
-  
-  
+Inductive BExp :=
+  | btrue : BExp
+  | bfalse : BExp
+  | bnot : BExp -> BExp
+  | band : BExp -> BExp -> BExp
+  | bor : BExp -> BExp -> BExp
+  | blessthan : AExp -> AExp -> BExp
+  | bequal : AExp -> AExp -> BExp.
+(*ar mai trebui <=, >, >=*)
+
+Notation "! A" := (bnot A) (at level 75).
+Infix "and'" := band (at level 80).
+Infix "or'" := bor (at level 80).
+Notation "A <' B" := (blessthan A B) (at level 70).
+Notation "A =' B" := (bequal A B) (at level 70).
+
+Reserved Notation "B ={ S }=> B'" (at level 70).
+
+Inductive beval : BExp -> Env -> bool -> Prop :=
+| e_false : forall sigma, bfalse ={ sigma }=> false
+| e_true : forall sigma, btrue ={ sigma }=> true
+| e_notfalse : forall b sigma,
+    b ={ sigma }=> false ->
+    (bnot b) ={ sigma }=> true
+| e_nottrue : forall b sigma,
+    b ={ sigma }=> true ->
+    (bnot b) ={ sigma }=> false
+| e_andfalse : forall b1 b2 sigma,
+    b1 ={ sigma }=> false ->
+    band b1 b2 ={ sigma }=> false
+| e_andtrue : forall b1 b2 sigma t,
+    b1 ={ sigma }=> true ->
+    b2 ={ sigma }=> t ->
+    band b1 b2 ={ sigma }=> t
+| e_orfalse : forall b1 b2 sigma t,
+    b1 ={ sigma }=> true ->
+    b2 ={ sigma }=> t ->
+    bor b1 b2 ={ sigma }=> t
+| e_ortrue : forall b1 b2 sigma,
+    b1 ={ sigma }=> true ->
+    bor b1 b2 ={ sigma }=> true
+| e_lessthan : forall a1 a2 i1 i2 sigma b,
+    a1 =[ sigma ]=> i1 ->
+    a2 =[ sigma ]=> i2 ->
+    b = Nat.leb i1 i2 ->
+    a1 <' a2 ={ sigma }=> b
+| e_equal : forall a1 a2 i1 i2 sigma b,
+    a1 =[ sigma ]=> i1 ->
+    a2 =[ sigma ]=> i2 ->
+    b = (Nat.eqb i1 i2) ->
+    a1 =' a2 ={ sigma }=> b
+where "B ={ S }=> B'" := (beval B S B').
+
+Hint Constructors beval.
