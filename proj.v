@@ -122,3 +122,51 @@ Inductive beval : BExp -> Env -> bool -> Prop :=
 where "B ={ S }=> B'" := (beval B S B').
 
 Hint Constructors beval.
+
+Inductive Stmt :=
+  | assignment : string -> AExp -> Stmt
+  | sequence : Stmt -> Stmt -> Stmt
+  | ifthen : BExp -> Stmt -> Stmt 
+  | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
+  | while : BExp -> Stmt -> Stmt.
+
+Notation "X ::= A" := (assignment X A) (at level 80).
+Notation "S ;; S'" := (sequence S S') (at level 90, right associativity).
+
+Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
+
+Inductive eval : Stmt -> Env -> Env -> Prop :=
+| e_assignment: forall a i x sigma sigma',
+    a =[ sigma ]=> i ->
+    sigma' = (update sigma x i) ->
+    (x ::= a) -{ sigma }-> sigma'
+| e_seq : forall s1 s2 sigma sigma1 sigma2,
+    s1 -{ sigma }-> sigma1 ->
+    s2 -{ sigma1 }-> sigma2 ->
+    (s1 ;; s2) -{ sigma }-> sigma2
+| e_iffalse: forall b s1 s2 sigma sigma2,
+    b ={ sigma }=> false ->
+    s2 -{ sigma }-> sigma2 ->
+    ifthenelse b s1 s2 -{ sigma }-> sigma2
+| e_iftrue : forall b s1 s2 sigma sigma1,
+    b ={ sigma }=> true ->
+    s1 -{ sigma }-> sigma1 ->
+    ifthenelse b s1 s2 -{ sigma }-> sigma1
+| e_ifthenelsefalse : forall b s1 s2 sigma sigma',
+    b ={ sigma }=> false ->
+    s2 -{ sigma }-> sigma' ->
+  ifthenelse b s1 s2 -{ sigma }-> sigma'
+| e_ifthenelsetrue :  forall b s1 s2 sigma sigma',
+    b ={ sigma }=> true ->
+    s1 -{ sigma }-> sigma' -> 
+    ifthenelse b s1 s2 -{ sigma }-> sigma'
+| e_whilefalse : forall b s sigma,
+    b ={ sigma }=> false ->
+    while b s -{ sigma }-> sigma
+| e_whiletrue : forall b s sigma sigma',
+    b ={ sigma }=> true ->
+    (s ;; while b s) -{ sigma }-> sigma' ->
+    while b s -{ sigma }-> sigma'
+where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
+
+Hint Constructors eval.
