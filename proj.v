@@ -21,6 +21,9 @@ Notation "A *' B" := (amul A B) (at level 50, left associativity).
 Notation "A /' B" := (adiv A B) (at level 50, left associativity).
 Notation "A %' B" := (amod A B) (at level 50, left associativity).
 
+Check (2 +' 3 *' 5).
+Check (12 %' 3 +' 5).
+
 Definition Env := string -> nat.
 Definition env : Env :=
   fun s => 0.
@@ -33,6 +36,19 @@ Definition update (env : Env) (s : string) (x : nat) : Env :=
 Check env.
 
 Reserved Notation "A =[ S ]=> N" (at level 70).
+
+Fixpoint aeval_fun (a : AExp) (env : Env) : nat :=
+  match a with
+  | anum n' => n'
+  | astring s' => env s'
+  | aplus a1 a2 => (aeval_fun a1 env) + (aeval_fun a2 env)
+  | aminus a1 a2 => (aeval_fun a1 env) + (aeval_fun a2 env)
+  | amul a1 a2 => (aeval_fun a1 env) * (aeval_fun a2 env)
+  | adiv a1 a2 => Nat.div (aeval_fun a1 env) (aeval_fun a2 env)
+  | amod a1 a2 => Nat.modulo (aeval_fun a1 env) (aeval_fun a2 env)
+  end.
+
+Compute aeval_fun (2 *' 3 %' 5) env.
 
 Inductive aeval : AExp -> Env -> nat -> Prop :=
 | const : forall n sigma, anum n =[ sigma ]=> n 
@@ -68,6 +84,21 @@ where "a =[ sigma ]=> n" := (aeval a sigma n).
 
 Hint Constructors aeval.
 
+Example ex0 : 10 =[ env ]=> 10.
+Proof.
+  apply const.
+Qed.
+
+Require Import Lia.
+
+Example ex2 : 2 +' 2 =[ env ]=> 4.
+Proof.
+  eapply add'.
+  - apply const.
+  - apply const.
+  - lia.
+Qed.
+
 Inductive BExp :=
   | btrue : BExp
   | bfalse : BExp
@@ -76,13 +107,30 @@ Inductive BExp :=
   | bor : BExp -> BExp -> BExp
   | blessthan : AExp -> AExp -> BExp
   | bequal : AExp -> AExp -> BExp.
-(*ar mai trebui <=, >, >=*)
 
 Notation "! A" := (bnot A) (at level 75).
 Infix "and'" := band (at level 80).
 Infix "or'" := bor (at level 80).
 Notation "A <' B" := (blessthan A B) (at level 70).
 Notation "A =' B" := (bequal A B) (at level 70).
+
+Check btrue.
+Check bfalse.
+
+Fixpoint beval_fun (b : BExp) (env : Env) : bool :=
+  match b with
+  | btrue => true
+  | bfalse => false
+  | bnot b' => negb (beval_fun b' env)
+  | band b1 b2 => andb (beval_fun b1 env) (beval_fun b2 env)
+  | bor b1 b2 => orb (beval_fun b1 env) (beval_fun b2 env)
+  | blessthan a1 a2 => Nat.leb (aeval_fun a1 env) (aeval_fun a2 env)
+  | bequal a1 a2 => Nat.eqb (aeval_fun a1 env) (aeval_fun a2 env)
+  end.
+
+Check ! (6 <' 10).
+Check btrue or' btrue.
+Check (1+1) =' 2.
 
 Reserved Notation "B ={ S }=> B'" (at level 70).
 
@@ -122,47 +170,3 @@ Inductive beval : BExp -> Env -> bool -> Prop :=
 where "B ={ S }=> B'" := (beval B S B').
 
 Hint Constructors beval.
-
-Inductive Stmt :=
-  | assignment : string -> AExp -> Stmt
-  | sequence : Stmt -> Stmt -> Stmt
-  | ifthen : BExp -> Stmt -> Stmt 
-  | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
-  | while : BExp -> Stmt -> Stmt.
-(*ar mai trebui si instructiunea for*)
-
-Notation "X ::= A" := (assignment X A) (at level 80).
-Notation "S ;; S'" := (sequence S S') (at level 90, right associativity).
-
-Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
-
-Inductive eval : Stmt -> Env -> Env -> Prop :=
-| e_assignment: forall a i x sigma sigma',
-    a =[ sigma ]=> i ->
-    sigma' = (update sigma x i) ->
-    (x ::= a) -{ sigma }-> sigma'
-| e_seq : forall s1 s2 sigma sigma1 sigma2,
-    s1 -{ sigma }-> sigma1 ->
-    s2 -{ sigma1 }-> sigma2 ->
-    (s1 ;; s2) -{ sigma }-> sigma2
-| e_ifthen : forall b s1 sigma sigma1,
-    b ={ sigma }=> true ->
-    ifthen b s1 -{ sigma }-> sigma1
-| e_ifthenelsefalse : forall b s1 s2 sigma sigma',
-    b ={ sigma }=> false ->
-    s2 -{ sigma }-> sigma' ->
-  ifthenelse b s1 s2 -{ sigma }-> sigma'
-| e_ifthenelsetrue :  forall b s1 s2 sigma sigma',
-    b ={ sigma }=> true ->
-    s1 -{ sigma }-> sigma' -> 
-    ifthenelse b s1 s2 -{ sigma }-> sigma'
-| e_whilefalse : forall b s sigma,
-    b ={ sigma }=> false ->
-    while b s -{ sigma }-> sigma
-| e_whiletrue : forall b s sigma sigma',
-    b ={ sigma }=> true ->
-    (s ;; while b s) -{ sigma }-> sigma' ->
-    while b s -{ sigma }-> sigma'
-where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
-
-Hint Constructors eval.
