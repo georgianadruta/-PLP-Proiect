@@ -129,6 +129,7 @@ Inductive Stmt :=
   | ifthen : BExp -> Stmt -> Stmt 
   | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
   | while : BExp -> Stmt -> Stmt.
+(*ar mai trebui si instructiunea for*)
 
 Notation "X ::= A" := (assignment X A) (at level 80).
 Notation "S ;; S'" := (sequence S S') (at level 90, right associativity).
