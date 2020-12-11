@@ -145,14 +145,9 @@ Inductive eval : Stmt -> Env -> Env -> Prop :=
     s1 -{ sigma }-> sigma1 ->
     s2 -{ sigma1 }-> sigma2 ->
     (s1 ;; s2) -{ sigma }-> sigma2
-| e_iffalse: forall b s1 s2 sigma sigma2,
-    b ={ sigma }=> false ->
-    s2 -{ sigma }-> sigma2 ->
-    ifthenelse b s1 s2 -{ sigma }-> sigma2
-| e_iftrue : forall b s1 s2 sigma sigma1,
+| e_ifthen : forall b s1 sigma sigma1,
     b ={ sigma }=> true ->
-    s1 -{ sigma }-> sigma1 ->
-    ifthenelse b s1 s2 -{ sigma }-> sigma1
+    ifthen b s1 -{ sigma }-> sigma1
 | e_ifthenelsefalse : forall b s1 s2 sigma sigma',
     b ={ sigma }=> false ->
     s2 -{ sigma }-> sigma' ->
