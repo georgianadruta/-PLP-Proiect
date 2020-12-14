@@ -194,8 +194,7 @@ Inductive BExp :=
   | band : BExp -> BExp -> BExp
   | bor : BExp -> BExp -> BExp
   | blessthan : AExp -> AExp -> BExp
-  | bequal : AExp -> AExp -> BExp
-  | bstrcmp : string -> string -> BExp. (*functia de comparare a 2 stringuri*)
+  | bequal : AExp -> AExp -> BExp.
 
 Coercion bvar : string >-> BExp.
 
@@ -205,11 +204,9 @@ Infix "and'" := band (at level 80).
 Infix "or'" := bor (at level 80).
 Notation "A <' B" := (blessthan A B) (at level 70).
 Notation "A =' B" := (bequal A B) (at level 70).
-Notation "'strcmp(' A ',' B ')'" := (bstrcmp A B) (at level 90).
 
 Check btrue.
 Check bfalse.
-Check strcmp("a", "b").
 
 Definition lt_ErrorBool (n1 n2 : ErrorNat) : ErrorBool :=
   match n1, n2 with 
@@ -238,6 +235,17 @@ Definition or_ErrorBool (n1 n2 : ErrorBool) : ErrorBool :=
    | boolean v1, boolean v2 => boolean (orb v1 v2)
   end.
 
+Inductive SExp :=
+| sconst: ErrorString -> SExp
+| svar : ErrorString -> SExp
+| concat : ErrorString -> ErrorString -> SExp (*concatenarea a doua stringuri*)
+| strcmp : ErrorString -> ErrorString -> SExp. (*comparatia a doua stringuri*)
+
+Coercion sconst : ErrorString >-> SExp.
+Coercion svar : ErrorString >-> SExp.
+
+Notation "'strcat(' A ',' B ')'" := (concat A B) (at level 90).
+Notation "'strcmp(' A ',' B ')'" := (strcmp A B) (at level 90).
 
 (*Definire semantica clasica pentru operatii boolene*)
 (* am nevoie de aeval_fun.............
@@ -331,7 +339,7 @@ Notation "'while' ( A ) { B }" := (while A B) (at level 90).
 Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
 
 (*Evaluarea expresiilor*)
-Inductive eval : Stmt -> Env -> Env -> Prop :=
+(*Inductive eval : Stmt -> Env -> Env -> Prop :=
 | e_seq : forall s1 s2 sigma sigma1 sigma2,
     s1 -{ sigma }-> sigma1 ->
     s2 -{ sigma1 }-> sigma2 ->
@@ -378,7 +386,7 @@ Inductive eval : Stmt -> Env -> Env -> Prop :=
     fordo e1 e2 e3 s -{ sigma }-> sigma'
 where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
 
-Hint Constructors eval.
+Hint Constructors eval.*)
  
 (*nu e necesara
 Fixpoint execute (s : Stmt) (env : Env) (gas : nat) : Env :=
