@@ -112,10 +112,29 @@ Definition update (env : Env) (s : string) (x : Types) : Env :=
 
 Compute (update (update env "y" (default)) "y" (boolval true) "y").
 
+(*Definire semantica clasica pentru operatiile aritmetice*)
+(*Fixpoint aeval_fun (a : AExp) (env : Env) : ErrorNat :=
+  match a with
+  | aunsigned n => n
+  | achar s => match (env s) with(*is expected to have type 
+"string".
+ WHYYYYYYYYYYYYYYYYYYYYY??? am incercat in 2 3 moduri... aceeasi eroare :) *)
+               | number s' => s'
+               | _ => ErrorNat
+               end
+  | aplus a1 a2 => (aplus (aeval_fun a1 env) (aeval_fun a2 env))
+  | aminus a1 a2 => (aeval_fun a1 env) + (aeval_fun a2 env)
+  | amul a1 a2 => (aeval_fun a1 env) * (aeval_fun a2 env)
+  | adiv a1 a2 => Nat.div (aeval_fun a1 env) (aeval_fun a2 env)
+  | amod a1 a2 => Nat.modulo (aeval_fun a1 env) (aeval_fun a2 env)
+  end.
+
+Compute aeval_fun (2 *' 3 %' 5) env.*)
+
 Reserved Notation "A =[ S ]=> N" (at level 70).
 
 (*Semantica Big-Step pentru operatiile aritmetice*)
-Inductive aeval : AExp -> Env -> unsigned -> Prop :=
+(*Inductive aeval : AExp -> Env -> unsigned -> Prop :=
 | const : forall n sigma, aunsigned n =[ sigma ]=> n 
 | var : forall v sigma, achar v =[ sigma ]=> match (sigma v) with
                                               | stringVal s' => s'
@@ -165,7 +184,7 @@ Proof.
   - apply const.
   - apply const.
   - lia.
-Qed.
+Qed.*)
 
 Inductive BExp :=
   | btrue : BExp
@@ -219,10 +238,32 @@ Definition or_ErrorBool (n1 n2 : ErrorBool) : ErrorBool :=
    | boolean v1, boolean v2 => boolean (orb v1 v2)
   end.
 
+
+(*Definire semantica clasica pentru operatii boolene*)
+(* am nevoie de aeval_fun.............
+Fixpoint beval_fun (b : BExp) (env : Env) : bool :=
+  match b with
+  | btrue => true
+  | bfalse => false
+  | bvar v => match (env v) with
+               | boolean n => n
+               | _ => err_bool
+               end
+  | bnot b' => negb (beval_fun b' env)
+  | band b1 b2 => andb (beval_fun b1 env) (beval_fun b2 env)
+  | bor b1 b2 => orb (beval_fun b1 env) (beval_fun b2 env)
+  | blessthan a1 a2 => Nat.leb (aeval_fun a1 env) (aeval_fun a2 env)
+  | bequal a1 a2 => Nat.eqb (aeval_fun a1 env) (aeval_fun a2 env)
+  end.
+
+Check ! (6 <' 10).
+Check btrue or' btrue.
+Check (1+1) =' 2.*)
+
 Reserved Notation "B ={ S }=> B'" (at level 70).
 
 (*Definire semantica Big-Step pentru operatii boolene*)
-Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
+(*Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
 | e_false : forall sigma, bfalse ={ sigma }=> false
 | e_true : forall sigma, btrue ={ sigma }=> true
 | e_var : forall v sigma, bvar v ={ sigma }=> match (sigma v) with 
@@ -261,7 +302,7 @@ Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
     a1 =' a2 ={ sigma }=> b
 where "B ={ S }=> B'" := (beval B S B').
 
-Hint Constructors beval.
+Hint Constructors beval.*)
 
 Inductive Stmt :=
   | sequence : Stmt -> Stmt -> Stmt
@@ -339,11 +380,39 @@ where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
 
 Hint Constructors eval.
  
-Definition while_stmt :=
-  unsigned "i" ::= 0 ;;
-  unsigned "sum" ::= 0 ;;
-  while ( "i" <' 6)
-  {
-    "sum" :n= "sum" +' "i";;
-    "i" :n= "i" +' 1
-  }
+(*nu e necesara
+Fixpoint execute (s : Stmt) (env : Env) (gas : nat) : Env :=
+  match gas with
+  | 0 => env
+  | S gas' =>   match s with
+                | sequence S1 S2 => eval_fun S2 (eval_fun S1 env gas') gas'
+                | declare_nat a AExp => update (update env a default) a (unsigned (aeval_fun AExp env)
+                | assign_nat a AExp => update env a (unsigned (aeval_fun AExp env)
+                | declare_bool b BExp => update (update env b default) b (unsigned (beval_fun BExp env)
+                | assign_bool b BExp => update env b (unsigned (beval_fun BExp env)
+                | ifthen cond S1 => match (beval_fun cond env) with
+                                    | error_bool => env
+                                    | boolean v => match v with
+                                                   | true => eval_fun S1 env gas'
+                                                   | false => env
+                                                   end
+                                    end
+                | ifthenelse cond S1 S2 => match (beval_fun cond env) with
+                                           | error_bool => env
+                                           | boolean v => match v with
+                                                   | true => eval_fun S1 env gas'
+                                                   | false => eval_fun S2 env gas'
+                                                   end
+                                           end
+                | while cond s' => match (beval_fun cond env) with
+                                           | error_bool => env
+                                           | boolean v => match v with
+                                                   | true => eval_fun (s' ;; (while cond s')) env gas'
+                                                   | false => env
+                                                   end
+                                    end
+                | fordo cond s' => if (beval cond env)
+                                   then execute (s' ;; (while cond s')) env gas'
+                end
+  end.*)
+
