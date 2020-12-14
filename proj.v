@@ -320,6 +320,7 @@ Reserved Notation "B ={ S }=> B'" (at level 70).
     a1 <' a2 ={ sigma }=> b
 where "B ={ S }=> B'" := (beval B S B').*)
 
+(*Strict pentru stringuri si operatii pe stringuri: concat si strcmp*)
 Inductive SExp :=
 | sconst: ErrorString -> SExp
 | svar : ErrorString -> SExp
@@ -331,6 +332,22 @@ Coercion svar : ErrorString >-> SExp.
 
 Notation "'strcat(' A ',' B ')'" := (concat A B) (at level 90).
 Notation "'strcmp(' A ',' B ')'" := (strcmp A B) (at level 90).
+
+(*Definition concat_ErrorString (s1 s2 : ErrorString) : ErrorString :=
+  match s1, s2 with
+    | err_string, _ => err_string
+    | _, err_string => err_string
+    | char v1, char v2 => concat(s1, s2)
+    end.
+
+Definition strcmp_ErrorString (s1 s2 : ErrorString) : ErrorString :=
+  match s1, s2 with
+    | err_string, _ => err_string
+    | _, err_string => err_string
+    | char v1, char v2 => strcmp(v1,v2)
+    end.
+Trebuie adaugat Fixpoint seval_fun si Inductive seval*)
+
 
 Inductive Stmt :=
   | sequence : Stmt -> Stmt -> Stmt
