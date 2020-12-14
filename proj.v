@@ -10,7 +10,7 @@ Import ListNotations.
 
 Inductive ErrorNat :=
 | err_nat : ErrorNat
-| unsigned : nat -> ErrorNat.
+| num : nat -> ErrorNat.
 
 Inductive ErrorBool :=
 | err_bool : ErrorBool
@@ -20,11 +20,9 @@ Inductive ErrorString :=
 | err_string : ErrorString
 | char : string -> ErrorString.
 
-(*Coercions pentru tipuri de variabile*)
-Coercion unsigned : nat >-> ErrorNat.
+Coercion num : nat >-> ErrorNat.
 Coercion boolean : bool >-> ErrorBool.
-Notation "'char('S')'" := (ErrorString S) (at level 30). (*fara paranteze imi da eroare in Inductive newType
-"Syntax error: [constr:operconstr] expected after 'char' (in [constr:operconstr])."*)
+Coercion char : string >-> ErrorString.
 
 (*Inglobez toate tipurile de variabile intr un singur tip*)
 Inductive Types :=
@@ -38,8 +36,8 @@ Inductive Types :=
 Scheme Equality for Types.
 
 Inductive AExp :=
-| aunsigned: ErrorNat -> AExp
-| achar: ErrorString -> AExp
+| avar: string -> AExp
+| anum: ErrorNat -> AExp
 | aplus : AExp -> AExp -> AExp
 | aminus: AExp -> AExp -> AExp
 | amul : AExp -> AExp -> AExp
@@ -47,8 +45,8 @@ Inductive AExp :=
 | amod : AExp -> AExp -> AExp.
 
 (*Coercions pentru constante numerice si variabile*)
-Coercion aunsigned : ErrorNat >-> AExp.
-Coercion achar : ErrorString >-> AExp.
+Coercion anum : ErrorNat >-> AExp.
+Coercion avar : string >-> AExp.
 
 (*Notatii pentru operatiile aritmetice*)
 Notation "A +' B" := (aplus A B) (at level 60, right associativity).
@@ -59,6 +57,45 @@ Notation "A %' B" := (amod A B) (at level 50, left associativity).
 
 Check (2 +' 3 *' 5).
 Check (12 %' 3 +' 5).
+
+Definition plus_ErrorNat (n1 n2 : ErrorNat) : ErrorNat :=
+  match n1, n2 with
+    | err_nat, _ => err_nat
+    | _, err_nat => err_nat
+    | num v1, num v2 => num (v1 + v2)
+    end.
+
+Definition sub_ErrorNat (n1 n2 : ErrorNat) : ErrorNat :=
+  match n1, n2 with
+    | err_nat, _ => err_nat
+    | _, err_nat => err_nat
+    | num n1, num n2 => if Nat.ltb n1 n2
+                        then err_nat
+                        else num (n1 - n2)
+    end.
+
+Definition mul_ErrorNat (n1 n2 : ErrorNat) : ErrorNat :=
+  match n1, n2 with
+    | err_nat, _ => err_nat
+    | _, err_nat => err_nat
+    | num v1, num v2 => num (v1 * v2)
+    end.
+
+Definition div_ErrorNat (n1 n2 : ErrorNat) : ErrorNat :=
+  match n1, n2 with
+    | err_nat, _ => err_nat
+    | _, err_nat => err_nat
+    | _, num 0 => err_nat
+    | num v1, num v2 => num (Nat.div v1 v2)
+    end.
+
+Definition mod_ErrorNat (n1 n2 : ErrorNat) : ErrorNat :=
+  match n1, n2 with
+    | err_nat, _ => err_nat
+    | _, err_nat => err_nat
+    | _, num 0 => err_nat
+    | num v1, num v2 => num (v1 - v2 * (Nat.div v1 v2))
+    end.
 
 (*Definire environment*)
 Definition Env := string -> Types.
@@ -113,59 +150,56 @@ Definition update (env : Env) (s : string) (x : Types) : Env :=
 Compute (update (update env "y" (default)) "y" (boolval true) "y").
 
 (*Definire semantica clasica pentru operatiile aritmetice*)
-(*Fixpoint aeval_fun (a : AExp) (env : Env) : ErrorNat :=
+Fixpoint aeval_fun (a : AExp) (env : Env) : ErrorNat :=
   match a with
-  | aunsigned n => n
-  | achar s => match (env s) with(*is expected to have type 
-"string".
- WHYYYYYYYYYYYYYYYYYYYYY??? am incercat in 2 3 moduri... aceeasi eroare :) *)
-               | number s' => s'
-               | _ => ErrorNat
-               end
-  | aplus a1 a2 => (aplus (aeval_fun a1 env) (aeval_fun a2 env))
-  | aminus a1 a2 => (aeval_fun a1 env) + (aeval_fun a2 env)
-  | amul a1 a2 => (aeval_fun a1 env) * (aeval_fun a2 env)
-  | adiv a1 a2 => Nat.div (aeval_fun a1 env) (aeval_fun a2 env)
-  | amod a1 a2 => Nat.modulo (aeval_fun a1 env) (aeval_fun a2 env)
+  | avar v => match (env v) with
+                | number n => n
+                | _ => err_nat
+              end
+  | anum n => n
+  | aplus a1 a2 => (plus_ErrorNat (aeval_fun a1 env) (aeval_fun a2 env))
+  | aminus a1 a2 => (sub_ErrorNat (aeval_fun a1 env) (aeval_fun a2 env))
+  | amul a1 a2 => (mul_ErrorNat(aeval_fun a1 env) (aeval_fun a2 env))
+  | adiv a1 a2 => (div_ErrorNat (aeval_fun a1 env) (aeval_fun a2 env))
+  | amod a1 a2 => (mod_ErrorNat (aeval_fun a1 env) (aeval_fun a2 env))
   end.
 
-Compute aeval_fun (2 *' 3 %' 5) env.*)
+Compute aeval_fun (2 *' 3 %' 5) env.
+Compute aeval_fun (5 /' 0) env.
 
 Reserved Notation "A =[ S ]=> N" (at level 70).
 
 (*Semantica Big-Step pentru operatiile aritmetice*)
-(*Inductive aeval : AExp -> Env -> unsigned -> Prop :=
-| const : forall n sigma, aunsigned n =[ sigma ]=> n 
-| var : forall v sigma, achar v =[ sigma ]=> match (sigma v) with
-                                              | stringVal s' => s'
-                                              | _ => errString
-                                              end
+Inductive aeval : AExp -> Env -> ErrorNat -> Prop :=
+| const : forall n sigma, anum n =[ sigma ]=> n 
+| var : forall v sigma, avar v =[ sigma ]=> match (sigma v) with
+                                              | number s' => s'
+                                              | _ => err_nat 
+                                            end
 | add' : forall a1 a2 i1 i2 sigma n,
     a1 =[ sigma ]=> i1 ->
     a2 =[ sigma ]=> i2 ->
-    n = i1 + i2 ->
+    n = (plus_ErrorNat i1 i2) ->
     a1 +' a2 =[sigma]=> n
 | sub' : forall a1 a2 i1 i2 sigma n,
     a1 =[ sigma ]=> i1 ->
     a2 =[ sigma ]=> i2 ->
-    i1 > i2 ->
-    n = i1 - i2 ->
+    n = (sub_ErrorNat i1 i2) ->
     a1 -' a2 =[sigma]=> n
 | times' : forall a1 a2 i1 i2 sigma n,
     a1 =[ sigma ]=> i1 ->
     a2 =[ sigma ]=> i2 ->
-    n = i1 * i2 ->
+    n = (mul_ErrorNat i1 i2) ->
     a1 *' a2 =[sigma]=> n
 | div' : forall a1 a2 i1 i2 sigma n,
     a1 =[ sigma ]=> i1 ->
     a2 =[ sigma ]=> i2 ->
-    i2 >0 -> 
-    n = Nat.div i1 i2 ->
+    n = (div_ErrorNat  i1 i2) ->
     a1 /' a2 =[sigma]=> n
 | mod' : forall a1 a2 i1 i2 sigma n,
     a1 =[ sigma ]=> i1 ->
     a2 =[ sigma ]=> i2 ->
-    n = Nat.modulo i1 i2 ->
+    n = (mod_ErrorNat i1 i2) ->
     a1 %' a2 =[sigma]=> n
 where "a =[ sigma ]=> n" := (aeval a sigma n).
 
@@ -176,44 +210,43 @@ Proof.
   apply const.
 Qed.
 
-Require Import Lia.
-
-Example ex2 : 2 +' 2 =[ env ]=> 4.
+Example ex1 : 10 /' 0 =[ env ]=> err_nat.
 Proof.
-  eapply add'.
+  eapply div'.
   - apply const.
   - apply const.
-  - lia.
-Qed.*)
+  - simpl. reflexivity.
+Qed.
+
+Example ex2 : 3 -' 6=[ env ]=> err_nat.
+Proof.
+  eapply sub'.
+  - apply const.
+  - apply const.
+  - simpl. reflexivity.
+Qed.
 
 Inductive BExp :=
+  | berror : BExp
   | btrue : BExp
   | bfalse : BExp
   | bvar : string -> BExp
   | bnot : BExp -> BExp
   | band : BExp -> BExp -> BExp
   | bor : BExp -> BExp -> BExp
-  | blessthan : AExp -> AExp -> BExp
-  | bequal : AExp -> AExp -> BExp.
+  | blessthan : AExp -> AExp -> BExp.
 
 Coercion bvar : string >-> BExp.
 
 (*Notatii pentru operatiile boolene*)
-Notation "! A" := (bnot A) (at level 75).
+Notation "!' A" := (bnot A) (at level 75).
 Infix "and'" := band (at level 80).
 Infix "or'" := bor (at level 80).
 Notation "A <' B" := (blessthan A B) (at level 70).
-Notation "A =' B" := (bequal A B) (at level 70).
 
 Check btrue.
 Check bfalse.
-
-Definition lt_ErrorBool (n1 n2 : ErrorNat) : ErrorBool :=
-  match n1, n2 with 
-   | err_nat, _=> err_bool
-   | _ , err_nat => err_bool
-   | unsigned v1, unsigned v2 => boolean (Nat.leb v1 v2)
-  end.
+Check (1 <' 4).
 
 Definition not_ErrorBool (n : ErrorBool) : ErrorBool :=
   match n with 
@@ -234,6 +267,58 @@ Definition or_ErrorBool (n1 n2 : ErrorBool) : ErrorBool :=
    | _ , err_bool => err_bool
    | boolean v1, boolean v2 => boolean (orb v1 v2)
   end.
+Definition lt_ErrorBool (n1 n2 : ErrorNat) : ErrorBool :=
+  match n1, n2 with 
+   | err_nat, _=> err_bool
+   | _ , err_nat => err_bool
+   | num v1, num v2 => boolean (Nat.leb v1 v2)
+  end.
+
+Fixpoint beval_fun (a : BExp) (envnat : Env) : ErrorBool :=
+  match a with
+  | berror => err_bool
+  | btrue => true
+  | bfalse => false
+  | bvar v => match (env v) with
+                | boolval n => n
+                | _ => err_bool
+                end
+  | bnot b1 => (not_ErrorBool (beval_fun b1 envnat))
+  | band b1 b2 => (and_ErrorBool (beval_fun b1 envnat) (beval_fun b2 envnat))
+  | bor b1 b2 => (or_ErrorBool (beval_fun b1 envnat) (beval_fun b2 envnat))
+  | blessthan a1 a2 => (lt_ErrorBool (aeval_fun a1 envnat) (aeval_fun a2 envnat))
+  end.
+
+Reserved Notation "B ={ S }=> B'" (at level 70).
+(*scap de o eroare dau de alta...........*)
+(*Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
+| b_error: forall sigma, berror  ={ sigma }=> err_bool
+| b_true : forall sigma, btrue ={ sigma }=> true
+| b_false : forall sigma, bfalse ={ sigma }=> false
+| b_var : forall v sigma, bvar v ={ sigma }=>  match (sigma v) with
+                                                | boolval x => x
+                                                | _ => err_bool
+                                                end
+| b_not : forall a1 i1 sigma b,
+    a1 ={ sigma }=> i1 ->
+    b = (not_ErrorBool i1) ->
+    !' a1 ={ sigma }=> b
+| b_and : forall a1 a2 i1 i2 sigma b,
+    a1 ={ sigma }=> i1 ->
+    a2 ={ sigma }=> i2 ->
+    b = (and_ErrorBool i1 i2) ->
+    (a1 and' a2) ={ sigma }=> b 
+| b_or : forall a1 a2 i1 i2 sigma b,
+    a1 ={ sigma }=> i1 ->
+    a2 ={ sigma }=> i2 ->
+    b = (or_ErrorBool i1 i2) ->
+    (a1 or' a2) ={ sigma }=> b 
+| b_lessthan : forall a1 a2 i1 i2 sigma b,
+    a1 =[ sigma ]=> i1 ->
+    a2 =[ sigma ]=> i2 ->
+    b = (lt_ErrorBool i1 i2) ->
+    a1 <' a2 ={ sigma }=> b
+where "B ={ S }=> B'" := (beval B S B').*)
 
 Inductive SExp :=
 | sconst: ErrorString -> SExp
@@ -247,129 +332,119 @@ Coercion svar : ErrorString >-> SExp.
 Notation "'strcat(' A ',' B ')'" := (concat A B) (at level 90).
 Notation "'strcmp(' A ',' B ')'" := (strcmp A B) (at level 90).
 
-(*Definire semantica clasica pentru operatii boolene*)
-(* am nevoie de aeval_fun.............
-Fixpoint beval_fun (b : BExp) (env : Env) : bool :=
-  match b with
-  | btrue => true
-  | bfalse => false
-  | bvar v => match (env v) with
-               | boolean n => n
-               | _ => err_bool
-               end
-  | bnot b' => negb (beval_fun b' env)
-  | band b1 b2 => andb (beval_fun b1 env) (beval_fun b2 env)
-  | bor b1 b2 => orb (beval_fun b1 env) (beval_fun b2 env)
-  | blessthan a1 a2 => Nat.leb (aeval_fun a1 env) (aeval_fun a2 env)
-  | bequal a1 a2 => Nat.eqb (aeval_fun a1 env) (aeval_fun a2 env)
-  end.
-
-Check ! (6 <' 10).
-Check btrue or' btrue.
-Check (1+1) =' 2.*)
-
-Reserved Notation "B ={ S }=> B'" (at level 70).
-
-(*Definire semantica Big-Step pentru operatii boolene*)
-(*Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
-| e_false : forall sigma, bfalse ={ sigma }=> false
-| e_true : forall sigma, btrue ={ sigma }=> true
-| e_var : forall v sigma, bvar v ={ sigma }=> match (sigma v) with 
-                                              | boolean x => x
-                                              | _ => err_bool
-                                              end
-| e_notfalse : forall b sigma,
-    b ={ sigma }=> false ->
-    (bnot b) ={ sigma }=> true
-| e_nottrue : forall b sigma,
-    b ={ sigma }=> true ->
-    (bnot b) ={ sigma }=> false
-| e_andfalse : forall b1 b2 sigma,
-    b1 ={ sigma }=> false ->
-    band b1 b2 ={ sigma }=> false
-| e_andtrue : forall b1 b2 sigma t,
-    b1 ={ sigma }=> true ->
-    b2 ={ sigma }=> t ->
-    band b1 b2 ={ sigma }=> t
-| e_orfalse : forall b1 b2 sigma t,
-    b1 ={ sigma }=> true ->
-    b2 ={ sigma }=> t ->
-    bor b1 b2 ={ sigma }=> t
-| e_ortrue : forall b1 b2 sigma,
-    b1 ={ sigma }=> true ->
-    bor b1 b2 ={ sigma }=> true
-| e_lessthan : forall a1 a2 i1 i2 sigma b,
-    a1 =[ sigma ]=> i1 ->
-    a2 =[ sigma ]=> i2 ->
-    b = (lt_ErrorBool i1 i2) ->
-    a1 <' a2 ={ sigma }=> b
-| e_equal : forall a1 a2 i1 i2 sigma b,
-    a1 =[ sigma ]=> i1 ->
-    a2 =[ sigma ]=> i2 ->
-    b = (Nat.eqb i1 i2) ->
-    a1 =' a2 ={ sigma }=> b
-where "B ={ S }=> B'" := (beval B S B').
-
-Hint Constructors beval.*)
-
 Inductive Stmt :=
   | sequence : Stmt -> Stmt -> Stmt
   | declare_val : string -> AExp -> Stmt (*initializare variabila*)
-  | assign_nat : string -> AExp -> Stmt (*pt a updata o variabila*)
+  | assign_val : string -> AExp -> Stmt (*pt a updata o variabila*)
   | declare_bool : string -> BExp -> Stmt
   | assign_bool : string -> AExp -> Stmt
+  | declare_string : string -> SExp -> Stmt 
+  | assign_string : string -> SExp -> Stmt
   | ifthen : BExp -> Stmt -> Stmt 
   | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
   | while : BExp -> Stmt -> Stmt 
-  | fordo : Stmt -> BExp -> Stmt -> Stmt -> Stmt
-  | strcat : string -> string -> Stmt
-  | strcpy : string -> string -> Stmt.
+  (*inca nu stiu cum sa le implementez*)
+  | switch : AExp -> list Cases -> Stmt 
+  | call : string -> list string -> Stmt
+with Cases :=
+  caseDefault : Stmt -> Cases 
+  | caseOther : AExp -> Stmt -> Cases.
 
 (*Notatii*)
 Notation "S ;; S'" := (sequence S S') (at level 90, right associativity).
-Notation " 'unsigned' A ::= B " := (declare_val A ) (at level 50).
-Notation "X :n= A" := (assign_nat X A) (at level 80).
-Notation " 'bool' A ::= B " := (declare_val A ) (at level 50).
-Notation "X :b= A" := (assign_bool X A) (at level 80).
-Notation "'if' ( A ) 'then' { B }" := (ifthen A B) (at level 90).
-Notation "'if' ( A ) 'then' { S1 } 'else' { S2 } " := (ifthenelse A S1 S2) (at level 97).
-Notation "'for' ( A ; B ; C ) { D }" := (A ;; while B ( S ;; C )) (at level 90).
-Notation "'while' ( A ) { B }" := (while A B) (at level 90).
 
+Notation "'unsigned' V" := (declare_val V) (at level 90, right associativity).
+Notation "'unsigned' V <-- E" := (declare_val V E) (at level 90, right associativity).
+
+Notation "'bool0' V" := (declare_bool V) (at level 90, right associativity).
+Notation "'bool' V <-- E" := (declare_bool V E) (at level 90, right associativity).
+
+Notation "'char' V" := (declare_string V) (at level 90, right associativity).
+Notation "'char' V <-- E" := (declare_string V E) (at level 90, right associativity).
+
+Notation "V :n= E" := (assign_val V E) (at level 90, right associativity).
+Notation "V :b= E" := (assign_bool V E) (at level 90, right associativity).
+Notation "V :s= E" := (assign_string V E) (at level 90, right associativity).
+
+Notation "'if(' B ')' 'then{' S '}end'" := (ifthen B S) (at level 97).
+Notation "'if(' B ')' 'then{' S1 '}else{' S2 '}end'" := (ifthenelse B S1 S2) (at level 97).
+
+Notation "'while(' B ')' 'do{' S '}'" := (while B S) (at level 97).
+
+Notation "'default:{' S '};'" := (caseDefault S) (at level 96).
+Notation "'case(' E '):{' S '};'" := (caseOther E S) (at level 96).
+Notation "'switch(' E '){' C1 .. Cn '}end'" := (switch E (cons C1 .. (cons Cn nil) .. )) (at level 97).
+
+(*Fixpoint eval_fun (s : Stmt) (env : Env) (gas: nat) : Env :=
+    match gas with
+    | 0 => env
+    | S gas' => match s with
+                  | sequence S1 S2 => eval_fun S2 (eval_fun S1 env gas') gas'
+                  | nat_decl a aexp => update (update env a default) a (number (aeval_fun aexp env))
+                  | bool_decl b bexp => update (update env b default) b (boolval (beval_fun bexp env))
+                  | nat_assign a aexp => update env a (number (aeval_fun aexp env))
+                  | bool_assign b bexp => update env b (boolval (beval_fun bexp env))
+                  | ifthen cond s' => 
+                      match (beval_fun cond env) with
+                       | err_bool => env
+                       | boolean v => match v with
+                                      | true => eval_fun s' env gas'
+                                      | false => env
+                                      end
+                      end
+                  | ifthenelse cond S1 S2 => 
+                      match (beval_fun cond env) with
+                        | err_bool => env
+                        | boolean v  => match v with
+                                           | true => eval_fun S1 env gas'
+                                           | false => eval_fun S2 env gas'
+                                        end
+                      end
+                  | while cond s' => 
+                      match (beval_fun cond env) with
+                        | err_bool => env
+                        | boolean v => match v with
+                                          | true => eval_fun (s' ;; (while cond s')) env gas'
+                                          | false => env
+                                       end
+                      end
+                 end
+     end.*)
+     
 Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
 
 (*Evaluarea expresiilor*)
 (*Inductive eval : Stmt -> Env -> Env -> Prop :=
+| e_nat_decl: forall a i x sigma sigma',
+   a =[ sigma ]=> i ->
+   sigma' = (update sigma x (number i)) ->
+   (x :n= a) -{ sigma }-> sigma'
+| e_nat_assign: forall a i x sigma sigma',
+    a =[ sigma ]=> i ->
+    sigma' = (update sigma x (number i)) ->
+    (x :n= a) -{ sigma }-> sigma'
+| e_bool_decl: forall a i x sigma sigma',
+   a ={ sigma }=> i ->
+   sigma' = (update sigma x (res_boolval i)) ->
+   (x :b= a) -{ sigma }-> sigma'
+| e_bool_assign: forall a i x sigma sigma',
+    a ={ sigma }=> i ->
+    sigma' = (update sigma x (boolval i)) ->
+    (x :b= a) -{ sigma }-> sigma'
 | e_seq : forall s1 s2 sigma sigma1 sigma2,
     s1 -{ sigma }-> sigma1 ->
     s2 -{ sigma1 }-> sigma2 ->
     (s1 ;; s2) -{ sigma }-> sigma2
-| e_declare_val : forall a i x sigma sigma', 
-    a =[ sigma ]=> i ->
-    sigma' = (update sigma x (unsigned i)) ->
-    (x ::= a) -{ sigma }-> sigma'
-| e_assign_val: forall a i x sigma sigma',
-    a =[ sigma ]=> i ->
-    sigma' = (update sigma x (unsigned i)) ->
-    (x :n= a) -{ sigma }-> sigma'
-| e_declare_bool : forall a i x sigma sigma', 
-    a =[ sigma ]=> i ->
-    sigma' = (update sigma x (boolean i)) ->
-    (x ::= a) -{ sigma }-> sigma'
-| e_assign_bool: forall a i x sigma sigma',
-   a =[ sigma ]=> i ->
-    sigma' = (update sigma x (boolean i)) ->
-    (x :b= a) -{ sigma }-> sigma'
-| e_ifthen : forall b s sigma,
-    ifthen b s -{ sigma }-> sigma1
-| e_ifthenelsefalse : forall b s1 s2 sigma sigma',
+| e_if_then : forall b s sigma,
+    ifthen b s -{ sigma }-> sigma
+| e_if_then_elsetrue : forall b s1 s2 sigma sigma',
+    b ={ sigma }=> true ->
+    s1 -{ sigma }-> sigma' ->
+    ifthenelse b s1 s2 -{ sigma }-> sigma' 
+| e_if_then_elsefalse : forall b s1 s2 sigma sigma',
     b ={ sigma }=> false ->
     s2 -{ sigma }-> sigma' ->
-    ifthenelse b s1 s2 -{ sigma }-> sigma'
-| e_ifthenelsetrue :  forall b s1 s2 sigma sigma',
-    b ={ sigma }=> true ->
-    s1 -{ sigma }-> sigma' -> 
-    ifthenelse b s1 s2 -{ sigma }-> sigma'
+    ifthenelse b s1 s2 -{ sigma }-> sigma' 
 | e_whilefalse : forall b s sigma,
     b ={ sigma }=> false ->
     while b s -{ sigma }-> sigma
@@ -377,50 +452,13 @@ Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
     b ={ sigma }=> true ->
     (s ;; while b s) -{ sigma }-> sigma' ->
     while b s -{ sigma }-> sigma'
-| e_forfalse : forall e1 e2 e3 s sigma,
-    e2 ={ sigma }=> false ->
-    fordo e1 e2 e3 s -{ sigma }-> sigma
-| e_fortrue : forall e1 e2 e3 s sigma sigma',
-    e2 ={ sigma }=> true ->
-    (e1 ;; while e2 (s ;; e3)) -{ sigma }-> sigma' ->
-    fordo e1 e2 e3 s -{ sigma }-> sigma'
 where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
 
 Hint Constructors eval.*)
- 
-(*nu e necesara
-Fixpoint execute (s : Stmt) (env : Env) (gas : nat) : Env :=
-  match gas with
-  | 0 => env
-  | S gas' =>   match s with
-                | sequence S1 S2 => eval_fun S2 (eval_fun S1 env gas') gas'
-                | declare_nat a AExp => update (update env a default) a (unsigned (aeval_fun AExp env)
-                | assign_nat a AExp => update env a (unsigned (aeval_fun AExp env)
-                | declare_bool b BExp => update (update env b default) b (unsigned (beval_fun BExp env)
-                | assign_bool b BExp => update env b (unsigned (beval_fun BExp env)
-                | ifthen cond S1 => match (beval_fun cond env) with
-                                    | error_bool => env
-                                    | boolean v => match v with
-                                                   | true => eval_fun S1 env gas'
-                                                   | false => env
-                                                   end
-                                    end
-                | ifthenelse cond S1 S2 => match (beval_fun cond env) with
-                                           | error_bool => env
-                                           | boolean v => match v with
-                                                   | true => eval_fun S1 env gas'
-                                                   | false => eval_fun S2 env gas'
-                                                   end
-                                           end
-                | while cond s' => match (beval_fun cond env) with
-                                           | error_bool => env
-                                           | boolean v => match v with
-                                                   | true => eval_fun (s' ;; (while cond s')) env gas'
-                                                   | false => env
-                                                   end
-                                    end
-                | fordo cond s' => if (beval cond env)
-                                   then execute (s' ;; (while cond s')) env gas'
-                end
-  end.*)
+
+
+
+
+
+
 
