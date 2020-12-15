@@ -497,3 +497,91 @@ Hint Constructors eval.*)
 
 
 
+ 
+(*Implementare stack*)
+Definition Var := string.
+
+Inductive Instruction :=
+| push_const : ErrorNat -> Instruction
+| push_var : ErrorString -> Instruction
+| adds : Instruction
+| muls : Instruction.
+
+Compute (push_const 10).
+Compute adds.
+
+Definition Stack := list ErrorNat.
+
+(*Fixpoint run_instruction (i : Instruction)
+         (env : ErrorString -> ErrorNat) (stack : Stack) : Stack :=
+  match i with
+  | push_const c => (c :: stack)
+  | push_var x => ((env x) :: stack)
+  | adds => match stack with
+           | n1 :: n2 :: stack' => (aplus n1 n2) :: stack'
+           | _ => stack
+           end 
+  | muls => match stack with
+           | n1 :: n2 :: stack' => (n1 * n2) :: stack'
+           | _ => stack
+           end
+  end.
+
+Compute (run_instruction (push_const 1012) env0 []).
+Compute (run_instruction (push_var "x") env0 []).
+Compute (run_instruction add env0 [10;12;20]).
+Compute (run_instruction mul env0 [10;12;20]).
+
+Fixpoint run_instructions (is' : list Instruction)
+         (env : Var -> nat) (stack : Stack) : Stack :=
+  match is' with
+  | [] => stack
+  | i :: is'' => run_instructions is'' env (run_instruction i env stack)
+  end.
+
+Definition pgm1 := [
+                    push_const 19 ;
+                    push_var "x"
+                  ].
+Compute run_instructions pgm1 env0 [].
+
+Definition pgm2 := [
+                    push_const 19 ;
+                    push_var "x" ;
+                    add;
+                    push_var "x";
+                    mul
+                  ].
+Compute run_instructions pgm2 env0 [].
+
+(* Compilation *)  
+Fixpoint compile (e : Exp) : list Instruction :=
+  match e with
+  | const c => [push_const c]
+  | id x => [push_var x]
+  | plus e1 e2 => (compile e1) ++ (compile e2) ++ [add]
+  | times e1 e2 => (compile e1) ++ (compile e2) ++ [mul]
+  end.
+
+Compute compile (2 +' (id "x")).
+Compute compile (2 +' (id "x") *' 7).
+Compute compile (2 *' (id "x") +' 7).
+
+Compute interpret (2 *' (id "x") +' 7) env0.
+Compute run_instructions
+        (compile (2 *' (id "x") +' 7))
+        env0
+        [].*)
+
+
+
+
+
+
+
+
+
+
+
+
+
