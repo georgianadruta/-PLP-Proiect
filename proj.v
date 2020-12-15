@@ -290,7 +290,6 @@ Fixpoint beval_fun (a : BExp) (envnat : Env) : ErrorBool :=
   end.
 
 Reserved Notation "B ={ S }=> B'" (at level 70).
-(*scap de o eroare dau de alta...........*)
 (*Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
 | b_error: forall sigma, berror  ={ sigma }=> err_bool
 | b_true : forall sigma, btrue ={ sigma }=> true
@@ -302,7 +301,7 @@ Reserved Notation "B ={ S }=> B'" (at level 70).
 | b_not : forall a1 i1 sigma b,
     a1 ={ sigma }=> i1 ->
     b = (not_ErrorBool i1) ->
-    !' a1 ={ sigma }=> b
+    !'a1 ={ sigma }=> b
 | b_and : forall a1 a2 i1 i2 sigma b,
     a1 ={ sigma }=> i1 ->
     a2 ={ sigma }=> i2 ->
@@ -320,17 +319,17 @@ Reserved Notation "B ={ S }=> B'" (at level 70).
     a1 <' a2 ={ sigma }=> b
 where "B ={ S }=> B'" := (beval B S B').*)
 
-(*Strict pentru stringuri si operatii pe stringuri: concat si strcmp*)
 Inductive SExp :=
 | sconst: ErrorString -> SExp
 | svar : ErrorString -> SExp
+| strlen : ErrorString -> SExp (*returneaza un char*)
 | concat : ErrorString -> ErrorString -> SExp (*concatenarea a doua stringuri*)
 | strcmp : ErrorString -> ErrorString -> SExp. (*comparatia a doua stringuri*)
 
 Coercion sconst : ErrorString >-> SExp.
 Coercion svar : ErrorString >-> SExp.
-
-Notation "'strcat(' A ',' B ')'" := (concat A B) (at level 90).
+Notation "'strlen(' A ')'" := (strlen A) (at level 90).
+Notation "'concat(' A ',' B ')'" := (concat A B) (at level 90).
 Notation "'strcmp(' A ',' B ')'" := (strcmp A B) (at level 90).
 
 (*Definition concat_ErrorString (s1 s2 : ErrorString) : ErrorString :=
@@ -348,6 +347,11 @@ Definition strcmp_ErrorString (s1 s2 : ErrorString) : ErrorString :=
     end.
 Trebuie adaugat Fixpoint seval_fun si Inductive seval*)
 
+Inductive vect :=
+| error_vect: vect
+| vector_nat : nat -> list ErrorNat -> vect
+| vector_bool : bool -> list ErrorBool -> vect
+| vector_str : string -> list ErrorString -> vect.
 
 Inductive Stmt :=
   | sequence : Stmt -> Stmt -> Stmt
@@ -357,6 +361,12 @@ Inductive Stmt :=
   | assign_bool : string -> AExp -> Stmt
   | declare_string : string -> SExp -> Stmt 
   | assign_string : string -> SExp -> Stmt
+  | declare_vectorV : string -> vect -> Stmt
+  | assign_vectorV : string -> vect -> Stmt
+  | declare_vectorB: string -> vect -> Stmt
+  | assign_vectorB : string -> vect -> Stmt
+  | declare_vectorS : string -> vect -> Stmt
+  | assign_vectorS : string -> vect -> Stmt
   | ifthen : BExp -> Stmt -> Stmt 
   | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
   | while : BExp -> Stmt -> Stmt 
@@ -371,13 +381,25 @@ with Cases :=
 Notation "S ;; S'" := (sequence S S') (at level 90, right associativity).
 
 Notation "'unsigned' V" := (declare_val V) (at level 90, right associativity).
-Notation "'unsigned' V <-- E" := (declare_val V E) (at level 90, right associativity).
+Notation "'unsigned' V = E" := (assign_val V E) (at level 90, right associativity).
 
 Notation "'bool0' V" := (declare_bool V) (at level 90, right associativity).
-Notation "'bool' V <-- E" := (declare_bool V E) (at level 90, right associativity).
+Notation "'bool' V = E" := (assign_bool V E) (at level 90, right associativity).
 
 Notation "'char' V" := (declare_string V) (at level 90, right associativity).
-Notation "'char' V <-- E" := (declare_string V E) (at level 90, right associativity).
+Notation "'char' V = E" := (assign_string V E) (at level 90, right associativity).
+
+Notation "'unsigned' A [ B ]n" := ( declare_vectorV A ( num B ) )(at level 50). (*unsigned A[100]*)
+Notation "'bool' A [ B ]b" := ( declare_vectorB A ( num B ) )(at level 50).
+Notation "'char' A [ B ]s" := ( declare_vectorS A ( num B ) )(at level 50).
+
+Notation "A [ B ]n" := ( assign_vectorV A ( vector_nat B nil ) )(at level 50).
+Notation "A [ B ]b" := ( assign_vectorB A ( vector_bool B nil ) )(at level 50).
+Notation "A [ B ]s" := ( assign_vectorS A ( vector_str B nil ) )(at level 50).
+
+Notation "A [ B ]n={ C1 ; C2 ; .. ; Cn }" := ( assign_vectorV A ( vector_nat B (cons num(C1) (cons num(C2) .. (cons num(Cn) nil) ..) ) ) )(at level 50).
+Notation "A [ B ]b={ C1 ; C2 ; .. ; Cn }" := ( assign_vectorB A ( vector_bool B (cons boolean(C1) (cons boolean(C2) .. (cons boolean(Cn) nil) ..) ) ) )(at level 50).
+Notation "A [ B ]s={ C1 ; C2 ; .. ; Cn }" := ( assign_vectorS A ( vector_str B (cons string(C1) (cons string(C2) .. (cons string(Cn) nil) ..) ) ) )(at level 50).
 
 Notation "V :n= E" := (assign_val V E) (at level 90, right associativity).
 Notation "V :b= E" := (assign_bool V E) (at level 90, right associativity).
@@ -426,12 +448,12 @@ Notation "'switch(' E '){' C1 .. Cn '}end'" := (switch E (cons C1 .. (cons Cn ni
                                        end
                       end
                  end
-     end.*)
-     
+     end.
+
 Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
 
 (*Evaluarea expresiilor*)
-(*Inductive eval : Stmt -> Env -> Env -> Prop :=
+Inductive eval : Stmt -> Env -> Env -> Prop :=
 | e_nat_decl: forall a i x sigma sigma',
    a =[ sigma ]=> i ->
    sigma' = (update sigma x (number i)) ->
@@ -472,10 +494,6 @@ Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
 where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
 
 Hint Constructors eval.*)
-
-
-
-
 
 
 
