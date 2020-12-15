@@ -290,7 +290,7 @@ Fixpoint beval_fun (a : BExp) (envnat : Env) : ErrorBool :=
   end.
 
 Reserved Notation "B ={ S }=> B'" (at level 70).
-(*Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
+Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
 | b_error: forall sigma, berror  ={ sigma }=> err_bool
 | b_true : forall sigma, btrue ={ sigma }=> true
 | b_false : forall sigma, bfalse ={ sigma }=> false
@@ -301,7 +301,7 @@ Reserved Notation "B ={ S }=> B'" (at level 70).
 | b_not : forall a1 i1 sigma b,
     a1 ={ sigma }=> i1 ->
     b = (not_ErrorBool i1) ->
-    !'a1 ={ sigma }=> b
+    (!'a1) ={ sigma }=> b
 | b_and : forall a1 a2 i1 i2 sigma b,
     a1 ={ sigma }=> i1 ->
     a2 ={ sigma }=> i2 ->
@@ -317,7 +317,7 @@ Reserved Notation "B ={ S }=> B'" (at level 70).
     a2 =[ sigma ]=> i2 ->
     b = (lt_ErrorBool i1 i2) ->
     a1 <' a2 ={ sigma }=> b
-where "B ={ S }=> B'" := (beval B S B').*)
+where "B ={ S }=> B'" := (beval B S B').
 
 Inductive SExp :=
 | sconst: ErrorString -> SExp
