@@ -24,6 +24,10 @@ Coercion num : nat >-> ErrorNat.
 Coercion boolean : bool >-> ErrorBool.
 Coercion char : string >-> ErrorString.
 
+Notation "unsigned( N )" := (num N).
+Notation "char( S )" := (char S).
+Notation "bool( B )" := (boolean B).
+
 (*Inglobez toate tipurile de variabile intr un singur tip*)
 Inductive Types :=
 | err_undeclared : Types
@@ -301,7 +305,7 @@ Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
 | b_not : forall a1 i1 sigma b,
     a1 ={ sigma }=> i1 ->
     b = (not_ErrorBool i1) ->
-    (!'a1) ={ sigma }=> b
+    (!' a1) ={ sigma }=> b
 | b_and : forall a1 a2 i1 i2 sigma b,
     a1 ={ sigma }=> i1 ->
     a2 ={ sigma }=> i2 ->
@@ -325,7 +329,18 @@ Inductive SExp :=
 | strlen : ErrorString -> SExp (*returneaza un char*)
 | concat : ErrorString -> ErrorString -> SExp (*concatenarea a doua stringuri*)
 | strcmp : ErrorString -> ErrorString -> SExp. (*comparatia a doua stringuri*)
+(*Inductive STREXP := 
+| svar : string -> STREXP
+| sconst: StringType -> STREXP
+| strcat : string -> string -> STREXP
+| get_vval_s : string -> nat -> STREXP
+| to_string : string -> STREXP.
 
+Notation "strcat( A , B )" := (strcat A B)(at level 52).
+Notation "strcpy( A , B )" := (strcat A B)(at level 52).
+
+Coercion sconst: StringType >-> STREXP.
+Coercion svar: string >-> STREXP.*)
 Coercion sconst : ErrorString >-> SExp.
 Coercion svar : ErrorString >-> SExp.
 Notation "'strlen(' A ')'" := (strlen A) (at level 90).
@@ -419,10 +434,10 @@ Notation "'switch(' E '){' C1 .. Cn '}end'" := (switch E (cons C1 .. (cons Cn ni
     | 0 => env
     | S gas' => match s with
                   | sequence S1 S2 => eval_fun S2 (eval_fun S1 env gas') gas'
-                  | nat_decl a aexp => update (update env a default) a (number (aeval_fun aexp env))
-                  | bool_decl b bexp => update (update env b default) b (boolval (beval_fun bexp env))
-                  | nat_assign a aexp => update env a (number (aeval_fun aexp env))
-                  | bool_assign b bexp => update env b (boolval (beval_fun bexp env))
+                  | declare_val a aexp => update (update env a default) a (number (aeval_fun aexp env))
+                  | declare_bool b bexp => update (update env b default) b (boolval (beval_fun bexp env))
+                  | assign_val a aexp => update env a (number (aeval_fun aexp env))
+                  | assign_bool b bexp => update env b (boolval (beval_fun bexp env))
                   | ifthen cond s' => 
                       match (beval_fun cond env) with
                        | err_bool => env
@@ -448,12 +463,12 @@ Notation "'switch(' E '){' C1 .. Cn '}end'" := (switch E (cons C1 .. (cons Cn ni
                                        end
                       end
                  end
-     end.
+     end.*)
 
 Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
 
 (*Evaluarea expresiilor*)
-Inductive eval : Stmt -> Env -> Env -> Prop :=
+(*Inductive eval : Stmt -> Env -> Env -> Prop :=
 | e_nat_decl: forall a i x sigma sigma',
    a =[ sigma ]=> i ->
    sigma' = (update sigma x (number i)) ->
@@ -464,7 +479,7 @@ Inductive eval : Stmt -> Env -> Env -> Prop :=
     (x :n= a) -{ sigma }-> sigma'
 | e_bool_decl: forall a i x sigma sigma',
    a ={ sigma }=> i ->
-   sigma' = (update sigma x (res_boolval i)) ->
+   sigma' = (update sigma x (boolval i)) ->
    (x :b= a) -{ sigma }-> sigma'
 | e_bool_assign: forall a i x sigma sigma',
     a ={ sigma }=> i ->
@@ -495,9 +510,6 @@ where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
 
 Hint Constructors eval.*)
 
-
-
- 
 (*Implementare stack*)
 Definition Var := string.
 
@@ -572,16 +584,3 @@ Compute run_instructions
         (compile (2 *' (id "x") +' 7))
         env0
         [].*)
-
-
-
-
-
-
-
-
-
-
-
-
-
