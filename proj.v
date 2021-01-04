@@ -335,20 +335,15 @@ Inductive SExp :=
 | svar : ErrorString -> SExp
 | strlen : ErrorString -> SExp (*returneaza un char*)
 | concat : ErrorString -> ErrorString -> SExp (*concatenarea a doua stringuri*)
-| strcmp : ErrorString -> ErrorString -> SExp(*comparatia a doua stringuri*)
-| strcat : string -> string -> SExp
-| strcpy : string -> string -> SExp.
+| strcmp : ErrorString -> ErrorString -> SExp(*comparatia a doua stringuri*).
 
 Coercion sconst : ErrorString >-> SExp.
 Coercion svar : ErrorString >-> SExp.
 Notation "'strlen(' A ')'" := (strlen A) (at level 90).
 Notation "'concat(' A ',' B ')'" := (concat A B) (at level 90).
 Notation "'strcmp(' A ',' B ')'" := (strcmp A B) (at level 90).
-Notation "'strcat(' A ',' B ')'" := (strcat A B)(at level 52).
-Notation "'strcpy(' A ',' B ')'" := (strcat A B)(at level 52).
 
-(*
-Definition concat_error (s1 s2 : SExp) : ErrorString :=
+(*Definition concat_error (s1 s2 : SExp) : ErrorString :=
   match s1, s2 with
     | err_string, _ => err_string
     | _, err_string => err_string
@@ -362,20 +357,6 @@ Definition strcmp_error (s1 s2 : SExp) : ErrorString :=
     | sconst str1, sconst str2 => strcmp(str1,str2)
   end.
 
-Definition strcat_error (s1 s2 : SExp) : ErrorString :=
-  match s1, s2 with
-    | err_string, _ => err_string
-    | _, err_string => err_string
-    | sconst str1, sconst str2 => strcat(str1,str2)
-  end.
-
-Definition strcpy_error (s1 s2 : SExp) : ErrorString :=
-  match s1, s2 with
-    | err_string, _ => err_string
-    | _, err_string => err_string
-    | sconst str1, sconst str2 => strcpy(str1,str2)
-  end.
-
 Fixpoint seval_fun (a : SExp) (env : Env) : ErrorString :=
   match a with
     | serror => err_string
@@ -386,8 +367,6 @@ Fixpoint seval_fun (a : SExp) (env : Env) : ErrorString :=
     | sconst v => v
     | concat a1 a2 => (concat_error (seval_fun a1 env) (seval_fun a2 env))
     | strcmp a1 a2 => (strcmp_error (seval_fun a1 env) (seval_fun a2 env))
-    | strcat a1 a2 => (strstr_error (seval_fun a1 env) (seval_fun a2 env))
-    | strcpy a1 a2 => (strcmp_error (seval_fun a1 env) (seval_fun a2 env))
   end.
 
 Inductive seval : SExp -> Env -> ErrorString -> Prop :=
@@ -407,11 +386,6 @@ Inductive seval : SExp -> Env -> ErrorString -> Prop :=
                s2 =[ sigma ]=> i2 ->
                s = (strcmp_error i1 i2) ->
                strcmp(s1,s2) ={ sigma }=> s
-  | s_strcat: forall s1 s2 i1 i2 sigma s,
-               s1 =[ sigma ]=> i1 ->
-               s2 =[ sigma ]=> i2 ->
-               s = (strcat_error i1 i2) ->
-               strcat(s1,s2) ={ sigma }=> s
   | s_strcpy: forall s1 s2 i1 i2 sigma s,
                s1 =[ sigma ]=> i1 ->
                s2 =[ sigma ]=> i2 ->
@@ -419,6 +393,10 @@ Inductive seval : SExp -> Env -> ErrorString -> Prop :=
                strcpy(s1,s2) ={ sigma }=> s
   where "B ={ S }=> B'" := (seval B S B').
 *)
+
+Check strlen("mama").
+Check concat("ab","cd").
+Check strcmp("plp","plp").
 
 (*tipuri de vectori: unsigned, bool, char*)
 Inductive vect :=
@@ -435,7 +413,7 @@ Inductive Stmt :=
   | assign_bool : string -> BExp -> Stmt
   | declare_string : string -> SExp -> Stmt 
   | assign_string : string -> SExp -> Stmt
-  | def_vector : string -> vect -> Stmt
+  | declare_vector : string -> vect -> Stmt
   | ifthen : BExp -> Stmt -> Stmt 
   | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
   | while : BExp -> Stmt -> Stmt 
@@ -463,14 +441,14 @@ Notation "'char' V" := (declare_string V) (at level 90, right associativity).
 Notation "'char' V ::= E" := (assign_string V E) (at level 90, right associativity).
 Notation "V :s= E" := (assign_string V E) (at level 90, right associativity).
 
-Notation "'unsigned' A [ B ]" := ( def_vector A ( vector_nat B nil ) )(at level 50).
-Notation "'unsigned' A [ B ]::={ C1 ; C2 ; .. ; Cn }" := ( def_vector A ( vector_nat B (cons nat(C1) (cons nat(C2) .. (cons nat(Cn) nil) ..) ) ) )(at level 50).
+Notation "'unsigned' A [ B ]" := ( declare_vector A ( vector_nat B nil ) )(at level 50).
+Notation "'unsigned' A [ B ]:n={ C1 ; C2 ; .. ; Cn }" := ( declare_vector A ( vector_nat B (cons nat(C1) (cons nat(C2) .. (cons nat(Cn) nil) ..) ) ) )(at level 50).
 
-Notation "'bool' A [ B ]" := ( def_vector A ( vector_bool B nil ) )(at level 50).
-Notation "'bool' A [ B ]::={ C1 ; C2 ; .. ; Cn }" := ( def_vector A ( vector_bool B (cons bool(C1) (cons bool(C2) .. (cons bool(Cn) nil) ..) ) ) )(at level 50).
+Notation "'bool' A [ B ]" := ( declare_vector A ( vector_bool B nil ) )(at level 50).
+Notation "'bool' A [ B ]:b={ C1 ; C2 ; .. ; Cn }" := ( declare_vector A ( vector_bool B (cons bool(C1) (cons bool(C2) .. (cons bool(Cn) nil) ..) ) ) )(at level 50).
 
-Notation "'char' A [ B ]" := ( def_vector A ( vector_str B nil ) )(at level 50).
-Notation "'char' A [ B ]::={ C1 ; C2 ; .. ; Cn }" := ( def_vector A ( vector_str B (cons string(C1) (cons string(C2) .. (cons string(Cn) nil) ..) ) ) )(at level 50).
+Notation "'char' A [ B ]" := ( declare_vector A ( vector_str B nil ) )(at level 50).
+Notation "'char' A [ B ]:s={ C1 ; C2 ; .. ; Cn }" := ( declare_vector A ( vector_str B (cons string(C1) (cons string(C2) .. (cons string(Cn) nil) ..) ) ) )(at level 50).
 
 Notation "'If' ( B ) 'Then' { S } 'End'" := (ifthen B S) (at level 97).
 Notation "'If' ( B ) 'Then' { S1 } 'Else' { S2 } 'End'" := (ifthenelse B S1 S2) (at level 97).
@@ -599,11 +577,11 @@ Check "str" :s= "eeee".
 Check break.
 Check continue.
 
-(*Check unsigned "A"[50].
-Check unsigned "B"[50]::={ 0 ; 10 ; 20 }.*)
-
 Check If (1 <' 2) Then {"a" :b= btrue} End.
 Check If (9 <' 3) Then {"x" :b= btrue} Else {"x" :b= bfalse} End.
+
+Check unsigned "A"[50].
+Check unsigned "B"[50] :n= { 0 ; 10 ; 20 }.
 
 Check For ("i" :n= 0; "i" <' 10; "i" :n= ("i" +' 1))
       {
