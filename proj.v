@@ -328,39 +328,17 @@ Inductive SExp :=
 | svar : ErrorString -> SExp
 | strlen : ErrorString -> SExp (*returneaza un char*)
 | concat : ErrorString -> ErrorString -> SExp (*concatenarea a doua stringuri*)
-| strcmp : ErrorString -> ErrorString -> SExp. (*comparatia a doua stringuri*)
-(*Inductive STREXP := 
-| svar : string -> STREXP
-| sconst: StringType -> STREXP
-| strcat : string -> string -> STREXP
-| get_vval_s : string -> nat -> STREXP
-| to_string : string -> STREXP.
+| strcmp : ErrorString -> ErrorString -> SExp(*comparatia a doua stringuri*)
+| strcat : string -> string -> SExp
+| strcpy : string -> string -> SExp.
 
-Notation "strcat( A , B )" := (strcat A B)(at level 52).
-Notation "strcpy( A , B )" := (strcat A B)(at level 52).
-
-Coercion sconst: StringType >-> STREXP.
-Coercion svar: string >-> STREXP.*)
 Coercion sconst : ErrorString >-> SExp.
 Coercion svar : ErrorString >-> SExp.
 Notation "'strlen(' A ')'" := (strlen A) (at level 90).
 Notation "'concat(' A ',' B ')'" := (concat A B) (at level 90).
 Notation "'strcmp(' A ',' B ')'" := (strcmp A B) (at level 90).
-
-(*Definition concat_ErrorString (s1 s2 : ErrorString) : ErrorString :=
-  match s1, s2 with
-    | err_string, _ => err_string
-    | _, err_string => err_string
-    | char v1, char v2 => concat(s1, s2)
-    end.
-
-Definition strcmp_ErrorString (s1 s2 : ErrorString) : ErrorString :=
-  match s1, s2 with
-    | err_string, _ => err_string
-    | _, err_string => err_string
-    | char v1, char v2 => strcmp(v1,v2)
-    end.
-Trebuie adaugat Fixpoint seval_fun si Inductive seval*)
+Notation "strcat( A , B )" := (strcat A B)(at level 52).
+Notation "strcpy( A , B )" := (strcat A B)(at level 52).
 
 Inductive vect :=
 | error_vect: vect
@@ -373,19 +351,13 @@ Inductive Stmt :=
   | declare_val : string -> AExp -> Stmt (*initializare variabila*)
   | assign_val : string -> AExp -> Stmt (*pt a updata o variabila*)
   | declare_bool : string -> BExp -> Stmt
-  | assign_bool : string -> AExp -> Stmt
+  | assign_bool : string -> BExp -> Stmt
   | declare_string : string -> SExp -> Stmt 
   | assign_string : string -> SExp -> Stmt
-  | declare_vectorV : string -> vect -> Stmt
-  | assign_vectorV : string -> vect -> Stmt
-  | declare_vectorB: string -> vect -> Stmt
-  | assign_vectorB : string -> vect -> Stmt
-  | declare_vectorS : string -> vect -> Stmt
-  | assign_vectorS : string -> vect -> Stmt
+  | def_vector : string -> vect -> Stmt
   | ifthen : BExp -> Stmt -> Stmt 
   | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
   | while : BExp -> Stmt -> Stmt 
-  (*inca nu stiu cum sa le implementez*)
   | switch : AExp -> list Cases -> Stmt 
   | call : string -> list string -> Stmt
 with Cases :=
@@ -396,40 +368,108 @@ with Cases :=
 Notation "S ;; S'" := (sequence S S') (at level 90, right associativity).
 
 Notation "'unsigned' V" := (declare_val V) (at level 90, right associativity).
-Notation "'unsigned' V = E" := (assign_val V E) (at level 90, right associativity).
+Notation "'unsigned' V ::= E" := (assign_val V E) (at level 90, right associativity).
+Notation "V :n= E" := (assign_val V E) (at level 90, right associativity).
 
-Notation "'bool0' V" := (declare_bool V) (at level 90, right associativity).
-Notation "'bool' V = E" := (assign_bool V E) (at level 90, right associativity).
+Notation "'bool' V" := (declare_bool V) (at level 90, right associativity).
+Notation "'bool' V ::= E" := (assign_bool V E) (at level 90, right associativity).
+Notation "V :b= E" := (assign_bool V E) (at level 90, right associativity).
 
 Notation "'char' V" := (declare_string V) (at level 90, right associativity).
-Notation "'char' V = E" := (assign_string V E) (at level 90, right associativity).
-
-Notation "'unsigned' A [ B ]n" := ( declare_vectorV A ( num B ) )(at level 50). (*unsigned A[100]*)
-Notation "'bool' A [ B ]b" := ( declare_vectorB A ( num B ) )(at level 50).
-Notation "'char' A [ B ]s" := ( declare_vectorS A ( num B ) )(at level 50).
-
-Notation "A [ B ]n" := ( assign_vectorV A ( vector_nat B nil ) )(at level 50).
-Notation "A [ B ]b" := ( assign_vectorB A ( vector_bool B nil ) )(at level 50).
-Notation "A [ B ]s" := ( assign_vectorS A ( vector_str B nil ) )(at level 50).
-
-Notation "A [ B ]n={ C1 ; C2 ; .. ; Cn }" := ( assign_vectorV A ( vector_nat B (cons num(C1) (cons num(C2) .. (cons num(Cn) nil) ..) ) ) )(at level 50).
-Notation "A [ B ]b={ C1 ; C2 ; .. ; Cn }" := ( assign_vectorB A ( vector_bool B (cons boolean(C1) (cons boolean(C2) .. (cons boolean(Cn) nil) ..) ) ) )(at level 50).
-Notation "A [ B ]s={ C1 ; C2 ; .. ; Cn }" := ( assign_vectorS A ( vector_str B (cons string(C1) (cons string(C2) .. (cons string(Cn) nil) ..) ) ) )(at level 50).
-
-Notation "V :n= E" := (assign_val V E) (at level 90, right associativity).
-Notation "V :b= E" := (assign_bool V E) (at level 90, right associativity).
+Notation "'char' V ::= E" := (assign_string V E) (at level 90, right associativity).
 Notation "V :s= E" := (assign_string V E) (at level 90, right associativity).
 
-Notation "'if(' B ')' 'then{' S '}end'" := (ifthen B S) (at level 97).
-Notation "'if(' B ')' 'then{' S1 '}else{' S2 '}end'" := (ifthenelse B S1 S2) (at level 97).
+Notation "'unsigned' A [ B ]" := ( def_vector A ( vector_nat B nil ) )(at level 50).
+Notation "'unsigned' A [ B ]::={ C1 ; C2 ; .. ; Cn }" := ( def_vector A ( vector_nat B (cons nat(C1) (cons nat(C2) .. (cons nat(Cn) nil) ..) ) ) )(at level 50).
 
-Notation "'while(' B ')' 'do{' S '}'" := (while B S) (at level 97).
+Notation "'bool' A [ B ]" := ( def_vector A ( vector_bool B nil ) )(at level 50).
+Notation "'bool' A [ B ]::={ C1 ; C2 ; .. ; Cn }" := ( def_vector A ( vector_bool B (cons bool(C1) (cons bool(C2) .. (cons bool(Cn) nil) ..) ) ) )(at level 50).
+
+Notation "'char' A [ B ]" := ( def_vector A ( vector_str B nil ) )(at level 50).
+Notation "'char' A [ B ]::={ C1 ; C2 ; .. ; Cn }" := ( def_vector A ( vector_str B (cons string(C1) (cons string(C2) .. (cons string(Cn) nil) ..) ) ) )(at level 50).
+
+Notation "'If' ( B ) 'Then' { S } 'End'" := (ifthen B S) (at level 97).
+Notation "'If' ( B ) 'Then' { S1 } 'Else' { S2 } 'End'" := (ifthenelse B S1 S2) (at level 97).
+
+Notation "'While'( B ) 'Do' { S }" := (while B S) (at level 97).
 
 Notation "'default:{' S '};'" := (caseDefault S) (at level 96).
 Notation "'case(' E '):{' S '};'" := (caseOther E S) (at level 96).
 Notation "'switch(' E '){' C1 .. Cn '}end'" := (switch E (cons C1 .. (cons Cn nil) .. )) (at level 97).
 
-(*Fixpoint eval_fun (s : Stmt) (env : Env) (gas: nat) : Env :=
+Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
+
+
+(*Evaluarea expresiilor*)
+Inductive eval : Stmt -> Env -> Env -> Prop :=
+| e_nat_decl: forall a i x sigma sigma',
+   a =[ sigma ]=> i ->
+   sigma' = (update sigma x (number i)) ->
+   (x :n= a) -{ sigma }-> sigma'
+| e_nat_assign: forall a i x sigma sigma',
+    a =[ sigma ]=> i ->
+    sigma' = (update sigma x (number i)) ->
+    (x :n= a) -{ sigma }-> sigma'
+| e_bool_decl: forall a i x sigma sigma',
+   a ={ sigma }=> i ->
+   sigma' = (update sigma x (boolval i)) ->
+   (x :b= a) -{ sigma }-> sigma'
+| e_bool_assign: forall a i x sigma sigma',
+    a ={ sigma }=> i ->
+    sigma' = (update sigma x (boolval i)) ->
+    (x :b= a) -{ sigma }-> sigma'
+| e_str_decl: forall a i x sigma sigma',
+    a ={ sigma }=> i ->
+    sigma' = (update sigma x ( strval i)) ->
+    (x :s= a) -{ sigma }-> sigma'
+| e_str_assign: forall a i x sigma sigma',
+    a ={ sigma }=> i ->
+    sigma' = (update sigma x (strval i)) ->
+    (x :s= a) -{ sigma }-> sigma'
+| e_seq : forall s1 s2 sigma sigma1 sigma2,
+    s1 -{ sigma }-> sigma1 ->
+    s2 -{ sigma1 }-> sigma2 ->
+    (s1 ;; s2) -{ sigma }-> sigma2
+| e_if_then : forall b s sigma,
+    ifthen b s -{ sigma }-> sigma
+| e_if_then_elsetrue : forall b s1 s2 sigma sigma',
+    b ={ sigma }=> true ->
+    s1 -{ sigma }-> sigma' ->
+    ifthenelse b s1 s2 -{ sigma }-> sigma' 
+| e_if_then_elsefalse : forall b s1 s2 sigma sigma',
+    b ={ sigma }=> false ->
+    s2 -{ sigma }-> sigma' ->
+    ifthenelse b s1 s2 -{ sigma }-> sigma' 
+| e_whilefalse : forall b s sigma,
+    b ={ sigma }=> false ->
+    while b s -{ sigma }-> sigma
+| e_whiletrue : forall b s sigma sigma',
+    b ={ sigma }=> true ->
+    (s ;; while b s) -{ sigma }-> sigma' ->
+    while b s -{ sigma }-> sigma'
+| e_forfalse : forall a b st s1 sigma sigma',
+    a -{ sigma }-> sigma' ->
+    b ={ sigma' }=> false ->
+    For a b st s1 -{ sigma }-> sigma'
+| e_fortrue : forall a b st s1 sigma sigma' sigma'',
+    a -{ sigma }-> sigma' ->
+    b ={ sigma' }=> true ->
+    (sequence s1 (sequence st  (forcontent b st s1))) -{ sigma' }-> sigma'' ->
+    For a b st s1 -{ sigma }-> sigma''
+| e_forcontentfalse : forall b st s1 sigma,
+    b ={ sigma}=> false ->
+    forcontent b st s1 -{ sigma }-> sigma
+| e_forcontenttrue : forall b st s1 sigma sigma',
+    b ={ sigma }=> true ->
+    (sequence s1 (sequence st (forcontent b st s1))) -{ sigma }-> sigma' ->
+    forcontent b st s1 -{ sigma }-> sigma'
+| e_switch: forall a i c b s sigma sigma',
+              a ={ sigma }=> i ->
+              b = (Nat.eqb i c) ->
+              switch b s -{ sigma }-> sigma'
+where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
+
+Fixpoint eval_fun (s : Stmt) (env : Env) (gas: nat) : Env :=
     match gas with
     | 0 => env
     | S gas' => match s with
@@ -463,54 +503,46 @@ Notation "'switch(' E '){' C1 .. Cn '}end'" := (switch E (cons C1 .. (cons Cn ni
                                        end
                       end
                  end
-     end.*)
+     end.
 
-Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
 
-(*Evaluarea expresiilor*)
-(*Inductive eval : Stmt -> Env -> Env -> Prop :=
-| e_nat_decl: forall a i x sigma sigma',
-   a =[ sigma ]=> i ->
-   sigma' = (update sigma x (number i)) ->
-   (x :n= a) -{ sigma }-> sigma'
-| e_nat_assign: forall a i x sigma sigma',
-    a =[ sigma ]=> i ->
-    sigma' = (update sigma x (number i)) ->
-    (x :n= a) -{ sigma }-> sigma'
-| e_bool_decl: forall a i x sigma sigma',
-   a ={ sigma }=> i ->
-   sigma' = (update sigma x (boolval i)) ->
-   (x :b= a) -{ sigma }-> sigma'
-| e_bool_assign: forall a i x sigma sigma',
-    a ={ sigma }=> i ->
-    sigma' = (update sigma x (boolval i)) ->
-    (x :b= a) -{ sigma }-> sigma'
-| e_seq : forall s1 s2 sigma sigma1 sigma2,
-    s1 -{ sigma }-> sigma1 ->
-    s2 -{ sigma1 }-> sigma2 ->
-    (s1 ;; s2) -{ sigma }-> sigma2
-| e_if_then : forall b s sigma,
-    ifthen b s -{ sigma }-> sigma
-| e_if_then_elsetrue : forall b s1 s2 sigma sigma',
-    b ={ sigma }=> true ->
-    s1 -{ sigma }-> sigma' ->
-    ifthenelse b s1 s2 -{ sigma }-> sigma' 
-| e_if_then_elsefalse : forall b s1 s2 sigma sigma',
-    b ={ sigma }=> false ->
-    s2 -{ sigma }-> sigma' ->
-    ifthenelse b s1 s2 -{ sigma }-> sigma' 
-| e_whilefalse : forall b s sigma,
-    b ={ sigma }=> false ->
-    while b s -{ sigma }-> sigma
-| e_whiletrue : forall b s sigma sigma',
-    b ={ sigma }=> true ->
-    (s ;; while b s) -{ sigma }-> sigma' ->
-    while b s -{ sigma }-> sigma'
-where "s -{ sigma }-> sigma'" := (eval s sigma sigma').
+Check unsigned "sum" ::= 0.
+Check "sum" :n= 50.
 
-Hint Constructors eval.*)
+Check bool "V" ::= bfalse.
+Check "V" :b= btrue.
 
-(*Implementare stack*)
+Check char "str" ::= "abcd".
+Check "str" :s= "eeee".
+
+Check unsigned "A"[50].
+Check unsigned "B"[50]::={ 0 ; 10 ; 20 }.
+
+Check If (1 <' 2) Then {"a" :b= btrue} End.
+Check If (9 <' 3) Then {"x" :b= btrue} Else {"x" :b= bfalse} End.
+Check While (sum <' 51) Do {
+        "sum" :n= ("sum" -' 1)
+      }.
+Check For ("i" :n= 0; "i" <' 10; "i" :n= ("i" +' 1))
+      {
+        "sum" :n= ("sum" +' "i")
+      }.
+Check break.
+Check continue.
+
+Definition while_stmt :=
+    Nat "i" ::= 0 ;;
+    Nat "sum" ::= 0 ;;
+    while 
+        ("i" <' 6) 
+        (
+           "sum" n= "sum" +' "i" ;;
+           "i" n= "i" +' 1
+        ).
+
+Compute (eval_fun while_stmt env 100) "sum".
+
+(*Implementare stack...................................................................................*)
 Definition Var := string.
 
 Inductive Instruction :=
@@ -584,3 +616,16 @@ Compute run_instructions
         (compile (2 *' (id "x") +' 7))
         env0
         [].*)
+
+
+
+
+
+
+
+
+
+
+
+
+
