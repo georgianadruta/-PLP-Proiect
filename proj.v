@@ -240,7 +240,9 @@ Inductive BExp :=
   | bnot : BExp -> BExp
   | band : BExp -> BExp -> BExp
   | bor : BExp -> BExp -> BExp
-  | blessthan : AExp -> AExp -> BExp.
+  | blessthan : AExp -> AExp -> BExp
+  | bgreaterthan : AExp -> AExp -> BExp
+  | bequal : AExp -> AExp -> BExp.
 
 Coercion bvar : string >-> BExp.
 
@@ -249,10 +251,14 @@ Notation "!' A" := (bnot A) (at level 75).
 Infix "and'" := band (at level 80).
 Infix "or'" := bor (at level 80).
 Notation "A <' B" := (blessthan A B) (at level 70).
+Notation "A >' B" := (bgreaterthan A B) (at level 70).
+Notation "A ==' B" := (bequal A B) (at level 70).
 
 Check btrue.
 Check bfalse.
 Check (1 <' 4).
+Check (1 >' 4).
+Check (7 ==' (6 + 1)).
 
 Definition not_ErrorBool (n : ErrorBool) : ErrorBool :=
   match n with 
@@ -280,6 +286,20 @@ Definition lt_ErrorBool (n1 n2 : ErrorNat) : ErrorBool :=
    | num v1, num v2 => boolean (Nat.leb v1 v2)
   end.
 
+Definition gt_ErrorBool (n1 n2 : ErrorNat) : ErrorBool :=
+  match n1, n2 with
+    | err_nat, _ => err_bool
+    | _, err_nat => err_bool
+    | num v1, num v2 => boolean (Nat.ltb v2 v1)
+  end.
+
+Definition equal_ErrorBool (n1 n2 : ErrorNat) : ErrorBool :=
+  match n1, n2 with
+    | err_nat, _ => err_bool
+    | _, err_nat => err_bool
+    | num v1, num v2 => boolean (Nat.eqb v1 v2)
+  end.
+
 Fixpoint beval_fun (a : BExp) (envnat : Env) : ErrorBool :=
   match a with
   | berror => err_bool
@@ -293,6 +313,8 @@ Fixpoint beval_fun (a : BExp) (envnat : Env) : ErrorBool :=
   | band b1 b2 => (and_ErrorBool (beval_fun b1 envnat) (beval_fun b2 envnat))
   | bor b1 b2 => (or_ErrorBool (beval_fun b1 envnat) (beval_fun b2 envnat))
   | blessthan a1 a2 => (lt_ErrorBool (aeval_fun a1 envnat) (aeval_fun a2 envnat))
+  | bgreaterthan a1 a2 => (gt_ErrorBool (aeval_fun a1 envnat) (aeval_fun a2 envnat))
+  | bequal a1 a2 => (equal_ErrorBool (aeval_fun a1 envnat) (aeval_fun a2 envnat))
   end.
 
 Reserved Notation "B ={ S }=> B'" (at level 70).
@@ -323,9 +345,21 @@ Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
     a2 =[ sigma ]=> i2 ->
     b = (lt_ErrorBool i1 i2) ->
     a1 <' a2 ={ sigma }=> b
+| b_greaterthan: forall a1 a2 i1 i2 sigma b,
+    a1 =[ sigma ]=> i1 ->
+    a2 =[ sigma ]=> i2 ->
+    b = (gt_ErrorBool i1 i2) ->
+    a1 >' a2 ={ sigma }=> b
+| b_equal: forall a1 a2 i1 i2 sigma b,
+    a1 =[ sigma ]=> i1 ->
+    a2 =[ sigma ]=> i2 ->
+    b = (equal_ErrorBool i1 i2) ->
+    a1 ==' a2 ={ sigma }=> b
 where "B ={ S }=> B'" := (beval B S B').
 
 Compute beval_fun (1 <' 5) env.
+Compute beval_fun (1 >' 5) env.
+Compute beval_fun (1 ==' 5) env.
 Compute beval_fun (!' btrue) env.
 Compute beval_fun (btrue and' bfalse) env.
 Compute beval_fun (btrue or' btrue) env.
@@ -422,6 +456,7 @@ Inductive Stmt :=
   | continue  : Stmt
   | switch : AExp -> list Cases -> Stmt 
   | call : string -> list string -> Stmt
+  | funcMain : Stmt -> Stmt
 with Cases :=
   caseDefault : Stmt -> Cases 
   | caseOther : AExp -> Stmt -> Cases.
@@ -453,13 +488,17 @@ Notation "'char' A [ B ]:s={ C1 ; C2 ; .. ; Cn }" := ( declare_vector A ( vector
 Notation "'If' ( B ) 'Then' { S } 'End'" := (ifthen B S) (at level 97).
 Notation "'If' ( B ) 'Then' { S1 } 'Else' { S2 } 'End'" := (ifthenelse B S1 S2) (at level 97).
 
-Notation "'While'( B ) 'Do {' S '}'" := (while B S) (at level 97).
+Notation "'While'( B ) ( S )" := (while B S) (at level 97).
 
-Notation "'for' ( A ; B ; C ) { D }" := (For A B C D) (at level 91).
+Notation "'for' ( A ; B ; C ) ( D )" := (For A B C D) (at level 91).
 
 Notation "'default:{' S '};'" := (caseDefault S) (at level 96).
 Notation "'case(' E '):{' S '};'" := (caseOther E S) (at level 96).
 Notation "'switch(' E '){' C1 .. Cn '}end'" := (switch E (cons C1 .. (cons Cn nil) .. )) (at level 97).
+
+Notation "'void main() (' C ')'" := (funcMain C )(at level 97).
+Notation "'function' A (( B1 ; B2 ; .. ; Bn )) ( C )" := (call A (cons B1 (cons B2 .. (cons Bn nil) ..)) C )(at level 97).
+Notation "'function' A ( ) ( C )" := (call A C )(at level 97).
 
 Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
 
@@ -580,45 +619,96 @@ Check continue.
 Check If (1 <' 2) Then {"a" :b= btrue} End.
 Check If (9 <' 3) Then {"x" :b= btrue} Else {"x" :b= bfalse} End.
 
-Check unsigned "A"[50].
-Check unsigned "B"[50] :n= { 0 ; 10 ; 20 }.
-
-Check For ("i" :n= 0; "i" <' 10; "i" :n= ("i" +' 1))
-      {
-        "sum" :n= ("sum" +' "i")
-      }.
-
-Check while (sum <' 51) Do 
-      {
+Check while ("sum" <' 51)
+      (
         "sum" :n= ("sum" -' 1)
-      }.
+      ).
+
+Definition sum :=
+  void main() 
+  (
+    unsigned "n" ::= 10 ;;
+    unsigned "i" ::= 1 ;; 
+    unsigned "sum" ::= 0 ;;
+    bool "x";;
+    If ( "i" <' "n" ) Then 
+       (
+          "x" :b= true
+       )
+    Else 
+       (
+          "x" :b= false
+       )
+    End;;
+    switch' ("n"):(
+      case (1): (
+        If (1=='1) Then 
+            (
+               nat "AA" := 7
+            ) 
+        Else 
+            (
+               int "BB" := 7
+            )
+        End) ;
+    case(2): (
+       If(1=='1) Then 
+            (
+               int "CC":= 13
+            ) 
+       End) ; 
+    default : (bool "3" := true)
+    );;
+    unsigned "v"[50]={1; 2; 3} ;;
+    while("a" <' 2)
+    (
+        "a"::="a" +' 1
+    )
+    ).
+
+(*
+Check function "test" (("x"; "y")):{
+    "x" :n= 3;;
+    "y" :s= "sss" 
+  }. 
+
+Compute unsigned "A"[50].
+Compute bool "B"[50]={ true ; false ; true }.
 
 Definition while_stmt :=
     unsigned "i" ::= 0 ;;
-    unsigned "sum" ::= 0;;
+    unsigned "sum" ::= 0 ;;
     while ("i" <' 6) 
-        {
+        (
            "sum" :n= "sum" +' "i" ;;
            "i" :n= "i" +' 1
-        }.
+        ).
 
 Compute (eval_fun while_stmt env 30) "sum".
 
-(*Implementare stack*)
-Definition Var := string.
+Check For ("i" :n= 0; "i" <' 10; "i" :n= ("i" +' 1))
+      (
+        "sum" :n= ("sum" +' "i")
+      ).
+*)
 
-Inductive Instruction :=
-| push_const : ErrorNat -> Instruction
-| push_var : ErrorString -> Instruction
-| adds : Instruction
-| muls : Instruction.
+(*Implementare stack*)
+Definition Var := string
+
+Inductive Instruction_stack :=
+| push_const : ErrorNat -> Instruction_stack
+| push_var : ErrorString -> Instruction_stack
+| adds : Instruction_stack
+| muls : Instruction_stack.
 
 Compute (push_const 10).
+Compute (push_var "a").
 Compute adds.
+Compute muls.
 
 Definition Stack := list ErrorNat.
 
-(*Fixpoint run_instruction (i : Instruction)
+Fixpoint run_instruction (i : Instruction_stack)
          (env : ErrorString -> ErrorNat) (stack : Stack) : Stack :=
   match i with
   | push_const c => (c :: stack)
@@ -660,7 +750,7 @@ Definition pgm2 := [
                   ].
 Compute run_instructions pgm2 env0 [].
 
-(* Compilation *)  
+(* Compilare *)  
 Fixpoint compile (e : Exp) : list Instruction :=
   match e with
   | const c => [push_const c]
