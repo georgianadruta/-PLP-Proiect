@@ -60,7 +60,7 @@ Notation "A /' B" := (adiv A B) (at level 50, left associativity).
 Notation "A %' B" := (amod A B) (at level 50, left associativity).
 
 Check (2 +' 3 *' 5).
-Check (12 %' 3 +' 5).
+Check (12 %' 3 -' 5).
 
 Definition plus_ErrorNat (n1 n2 : ErrorNat) : ErrorNat :=
   match n1, n2 with
@@ -170,6 +170,8 @@ Fixpoint aeval_fun (a : AExp) (env : Env) : ErrorNat :=
 
 Compute aeval_fun (2 *' 3 %' 5) env.
 Compute aeval_fun (5 /' 0) env.
+Compute aeval_fun (12 %' 0) env.
+Compute aeval_fun (12 -' 21) env.
 
 Reserved Notation "A =[ S ]=> N" (at level 70).
 
@@ -323,6 +325,11 @@ Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
     a1 <' a2 ={ sigma }=> b
 where "B ={ S }=> B'" := (beval B S B').
 
+Compute beval_fun (1 <' 5) env.
+Compute beval_fun (!' btrue) env.
+Compute beval_fun (btrue and' bfalse) env.
+Compute beval_fun (btrue or' btrue) env.
+
 Inductive SExp :=
 | sconst: ErrorString -> SExp
 | svar : ErrorString -> SExp
@@ -337,9 +344,83 @@ Coercion svar : ErrorString >-> SExp.
 Notation "'strlen(' A ')'" := (strlen A) (at level 90).
 Notation "'concat(' A ',' B ')'" := (concat A B) (at level 90).
 Notation "'strcmp(' A ',' B ')'" := (strcmp A B) (at level 90).
-Notation "strcat( A , B )" := (strcat A B)(at level 52).
-Notation "strcpy( A , B )" := (strcat A B)(at level 52).
+Notation "'strcat(' A ',' B ')'" := (strcat A B)(at level 52).
+Notation "'strcpy(' A ',' B ')'" := (strcat A B)(at level 52).
 
+(*
+Definition concat_error (s1 s2 : SExp) : ErrorString :=
+  match s1, s2 with
+    | err_string, _ => err_string
+    | _, err_string => err_string
+    | sconst str1, sconst str2 => concat(str1,str2)
+  end.
+
+Definition strcmp_error (s1 s2 : SExp) : ErrorString :=
+  match s1, s2 with
+    | err_string, _ => err_string
+    | _, err_string => err_string
+    | sconst str1, sconst str2 => strcmp(str1,str2)
+  end.
+
+Definition strcat_error (s1 s2 : SExp) : ErrorString :=
+  match s1, s2 with
+    | err_string, _ => err_string
+    | _, err_string => err_string
+    | sconst str1, sconst str2 => strcat(str1,str2)
+  end.
+
+Definition strcpy_error (s1 s2 : SExp) : ErrorString :=
+  match s1, s2 with
+    | err_string, _ => err_string
+    | _, err_string => err_string
+    | sconst str1, sconst str2 => strcpy(str1,str2)
+  end.
+
+Fixpoint seval_fun (a : SExp) (env : Env) : ErrorString :=
+  match a with
+    | serror => err_string
+    | svar v => match (env v) with
+                  | strval s => s
+                  | _ => strval
+                end
+    | sconst v => v
+    | concat a1 a2 => (concat_error (seval_fun a1 env) (seval_fun a2 env))
+    | strcmp a1 a2 => (strcmp_error (seval_fun a1 env) (seval_fun a2 env))
+    | strcat a1 a2 => (strstr_error (seval_fun a1 env) (seval_fun a2 env))
+    | strcpy a1 a2 => (strcmp_error (seval_fun a1 env) (seval_fun a2 env))
+  end.
+
+Inductive seval : SExp -> Env -> ErrorString -> Prop :=
+  | s_error: forall sigma, err_string  ={ sigma }=> error_str
+  | s_var: forall v sigma, svar v ={ sigma }=>  match (sigma v) with
+                                                   | strval x => x
+                                                   | _ => err_string
+                                                 end
+  | s_const: forall s sigma, sconst ={ sigma }=> s
+  | s_concat: forall s1 s2 i1 i2 sigma s,
+               s1 =[ sigma ]=> i1 ->
+               s2 =[ sigma ]=> i2 ->
+               s = (concat_error i1 i2) ->
+               concat(s1,s2) ={ sigma }=> s
+  | s_strcmp: forall s1 s2 i1 i2 sigma s,
+               s1 =[ sigma ]=> i1 ->
+               s2 =[ sigma ]=> i2 ->
+               s = (strcmp_error i1 i2) ->
+               strcmp(s1,s2) ={ sigma }=> s
+  | s_strcat: forall s1 s2 i1 i2 sigma s,
+               s1 =[ sigma ]=> i1 ->
+               s2 =[ sigma ]=> i2 ->
+               s = (strcat_error i1 i2) ->
+               strcat(s1,s2) ={ sigma }=> s
+  | s_strcpy: forall s1 s2 i1 i2 sigma s,
+               s1 =[ sigma ]=> i1 ->
+               s2 =[ sigma ]=> i2 ->
+               s = (strcpy_error i1 i2) ->
+               strcpy(s1,s2) ={ sigma }=> s
+  where "B ={ S }=> B'" := (seval B S B').
+*)
+
+(*tipuri de vectori: unsigned, bool, char*)
 Inductive vect :=
 | error_vect: vect
 | vector_nat : nat -> list ErrorNat -> vect
@@ -348,7 +429,7 @@ Inductive vect :=
 
 Inductive Stmt :=
   | sequence : Stmt -> Stmt -> Stmt
-  | declare_val : string -> AExp -> Stmt (*initializare variabila*)
+  | declare_val : string -> AExp -> Stmt (*declarare variabila cu sau fara initializare*)
   | assign_val : string -> AExp -> Stmt (*pt a updata o variabila*)
   | declare_bool : string -> BExp -> Stmt
   | assign_bool : string -> BExp -> Stmt
@@ -358,6 +439,9 @@ Inductive Stmt :=
   | ifthen : BExp -> Stmt -> Stmt 
   | ifthenelse : BExp -> Stmt -> Stmt -> Stmt
   | while : BExp -> Stmt -> Stmt 
+  | For : Stmt -> BExp -> Stmt -> Stmt ->Stmt
+  | break : Stmt
+  | continue  : Stmt
   | switch : AExp -> list Cases -> Stmt 
   | call : string -> list string -> Stmt
 with Cases :=
@@ -391,7 +475,9 @@ Notation "'char' A [ B ]::={ C1 ; C2 ; .. ; Cn }" := ( def_vector A ( vector_str
 Notation "'If' ( B ) 'Then' { S } 'End'" := (ifthen B S) (at level 97).
 Notation "'If' ( B ) 'Then' { S1 } 'Else' { S2 } 'End'" := (ifthenelse B S1 S2) (at level 97).
 
-Notation "'While'( B ) 'Do' { S }" := (while B S) (at level 97).
+Notation "'While'( B ) 'Do {' S '}'" := (while B S) (at level 97).
+
+Notation "'for' ( A ; B ; C ) { D }" := (For A B C D) (at level 91).
 
 Notation "'default:{' S '};'" := (caseDefault S) (at level 96).
 Notation "'case(' E '):{' S '};'" := (caseOther E S) (at level 96).
@@ -399,8 +485,7 @@ Notation "'switch(' E '){' C1 .. Cn '}end'" := (switch E (cons C1 .. (cons Cn ni
 
 Reserved Notation "S -{ Sigma }-> Sigma'" (at level 60).
 
-
-(*Evaluarea expresiilor*)
+(*Evaluarea expresiilor
 Inductive eval : Stmt -> Env -> Env -> Prop :=
 | e_nat_decl: forall a i x sigma sigma',
    a =[ sigma ]=> i ->
@@ -420,7 +505,7 @@ Inductive eval : Stmt -> Env -> Env -> Prop :=
     (x :b= a) -{ sigma }-> sigma'
 | e_str_decl: forall a i x sigma sigma',
     a ={ sigma }=> i ->
-    sigma' = (update sigma x ( strval i)) ->
+    sigma' = (update sigma x (strval i)) ->
     (x :s= a) -{ sigma }-> sigma'
 | e_str_assign: forall a i x sigma sigma',
     a ={ sigma }=> i ->
@@ -456,13 +541,6 @@ Inductive eval : Stmt -> Env -> Env -> Prop :=
     b ={ sigma' }=> true ->
     (sequence s1 (sequence st  (forcontent b st s1))) -{ sigma' }-> sigma'' ->
     For a b st s1 -{ sigma }-> sigma''
-| e_forcontentfalse : forall b st s1 sigma,
-    b ={ sigma}=> false ->
-    forcontent b st s1 -{ sigma }-> sigma
-| e_forcontenttrue : forall b st s1 sigma sigma',
-    b ={ sigma }=> true ->
-    (sequence s1 (sequence st (forcontent b st s1))) -{ sigma }-> sigma' ->
-    forcontent b st s1 -{ sigma }-> sigma'
 | e_switch: forall a i c b s sigma sigma',
               a ={ sigma }=> i ->
               b = (Nat.eqb i c) ->
@@ -476,8 +554,10 @@ Fixpoint eval_fun (s : Stmt) (env : Env) (gas: nat) : Env :=
                   | sequence S1 S2 => eval_fun S2 (eval_fun S1 env gas') gas'
                   | declare_val a aexp => update (update env a default) a (number (aeval_fun aexp env))
                   | declare_bool b bexp => update (update env b default) b (boolval (beval_fun bexp env))
+                  | declare_string b sexp => update (update env b default) b (strval (seval_fun sexp env))
                   | assign_val a aexp => update env a (number (aeval_fun aexp env))
                   | assign_bool b bexp => update env b (boolval (beval_fun bexp env))
+                  | assign_string b sexp => update env b (strval (seval_fun sexp env))
                   | ifthen cond s' => 
                       match (beval_fun cond env) with
                        | err_bool => env
@@ -502,9 +582,10 @@ Fixpoint eval_fun (s : Stmt) (env : Env) (gas: nat) : Env :=
                                           | false => env
                                        end
                       end
+                  (*trebuie adaugate for si switch*)
                  end
      end.
-
+*)
 
 Check unsigned "sum" ::= 0.
 Check "sum" :n= 50.
@@ -515,34 +596,37 @@ Check "V" :b= btrue.
 Check char "str" ::= "abcd".
 Check "str" :s= "eeee".
 
-Check unsigned "A"[50].
-Check unsigned "B"[50]::={ 0 ; 10 ; 20 }.
+Check break.
+Check continue.
+
+(*Check unsigned "A"[50].
+Check unsigned "B"[50]::={ 0 ; 10 ; 20 }.*)
 
 Check If (1 <' 2) Then {"a" :b= btrue} End.
 Check If (9 <' 3) Then {"x" :b= btrue} Else {"x" :b= bfalse} End.
-Check While (sum <' 51) Do {
-        "sum" :n= ("sum" -' 1)
-      }.
+
 Check For ("i" :n= 0; "i" <' 10; "i" :n= ("i" +' 1))
       {
         "sum" :n= ("sum" +' "i")
       }.
-Check break.
-Check continue.
+
+Check while (sum <' 51) Do 
+      {
+        "sum" :n= ("sum" -' 1)
+      }.
 
 Definition while_stmt :=
-    Nat "i" ::= 0 ;;
-    Nat "sum" ::= 0 ;;
-    while 
-        ("i" <' 6) 
-        (
-           "sum" n= "sum" +' "i" ;;
-           "i" n= "i" +' 1
-        ).
+    unsigned "i" ::= 0 ;;
+    unsigned "sum" ::= 0;;
+    while ("i" <' 6) 
+        {
+           "sum" :n= "sum" +' "i" ;;
+           "i" :n= "i" +' 1
+        }.
 
-Compute (eval_fun while_stmt env 100) "sum".
+Compute (eval_fun while_stmt env 30) "sum".
 
-(*Implementare stack...................................................................................*)
+(*Implementare stack*)
 Definition Var := string.
 
 Inductive Instruction :=
@@ -616,16 +700,3 @@ Compute run_instructions
         (compile (2 *' (id "x") +' 7))
         env0
         [].*)
-
-
-
-
-
-
-
-
-
-
-
-
-
