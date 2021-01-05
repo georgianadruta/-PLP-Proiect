@@ -39,6 +39,15 @@ Inductive Types :=
 
 Scheme Equality for Types.
 
+(*Valori by default*)
+Definition default_val (n : nat) : Types :=
+	match n with
+		| 0 => number 0
+		| 1 => boolval false
+		| 2 => strval ""
+		| _ => default
+	end.
+
 Inductive AExp :=
 | avar: string -> AExp
 | anum: ErrorNat -> AExp
@@ -136,6 +145,9 @@ match a with
                 end
 end.
 
+Compute (CheckType (boolval true) (boolval false)).
+Compute (CheckType (number 0) err_undeclared).
+
 Definition update (env : Env) (s : string) (x : Types) : Env :=
   fun y => if (eqb y s)
               then 
@@ -152,6 +164,10 @@ Definition update (env : Env) (s : string) (x : Types) : Env :=
 
 
 Compute (update (update env "y" (default)) "y" (boolval true) "y").
+Compute (update (update env "y" (default)) "y" (strval "test") "y").
+Compute ((update (update (update env "y" default) "y" (number 10)) "y" (boolval true)) "y").
+Compute ((update (update (update env "y" default) "y" (number 10)) "y" (strval "test")) "y").
+
 
 (*Definire semantica clasica pentru operatiile aritmetice*)
 Fixpoint aeval_fun (a : AExp) (env : Env) : ErrorNat :=
@@ -227,6 +243,14 @@ Qed.
 Example ex2 : 3 -' 6=[ env ]=> err_nat.
 Proof.
   eapply sub'.
+  - apply const.
+  - apply const.
+  - simpl. reflexivity.
+Qed.
+
+Example ex3 : 7 %' 0 =[ env ]=> err_nat.
+Proof.
+  eapply mod'.
   - apply const.
   - apply const.
   - simpl. reflexivity.
@@ -318,6 +342,7 @@ Fixpoint beval_fun (a : BExp) (envnat : Env) : ErrorBool :=
   end.
 
 Reserved Notation "B ={ S }=> B'" (at level 70).
+
 Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
 | b_error: forall sigma, berror  ={ sigma }=> err_bool
 | b_true : forall sigma, btrue ={ sigma }=> true
@@ -357,6 +382,16 @@ Inductive beval : BExp -> Env -> ErrorBool -> Prop :=
     a1 ==' a2 ={ sigma }=> b
 where "B ={ S }=> B'" := (beval B S B').
 
+Example ex1' : bnot (0 <' "n") ={ env }=> err_bool.
+Proof.
+  eapply b_not.
+  eapply b_lessthan.
+  - eapply const.
+  - eapply var.
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+Qed.
+
 Compute beval_fun (1 <' 5) env.
 Compute beval_fun (1 >' 5) env.
 Compute beval_fun (1 ==' 5) env.
@@ -384,11 +419,18 @@ Notation "'strcmp(' A ',' B ')'" := (strcmp A B) (at level 90).
     | sconst str1, sconst str2 => concat(str1,str2)
   end.
 
-Definition strcmp_error (s1 s2 : SExp) : ErrorString :=
+Definition strcmp_error (s1 s2 : SExp) : ErrorBool :=
   match s1, s2 with
-    | err_string, _ => err_string
-    | _, err_string => err_string
-    | sconst str1, sconst str2 => strcmp(str1,str2)
+    | err_string, _ => err_bool
+    | _, err_string => err_bool
+    | svar str1, svar str2 => match str1, str2 with
+                                | char ss1, char ss2 => eqb ss1 ss2
+                                | _, _ => err_bool
+                              end
+    | sconst str1, sconst str2 => match str1, str2 with
+                                    | char ss1, char ss2 => eqb ss1 ss2
+                                    | _, _ => err_bool
+                                  end
   end.
 
 Fixpoint seval_fun (a : SExp) (env : Env) : ErrorString :=
@@ -651,13 +693,13 @@ Definition sum :=
                int "BB" := 7
             )
         End) ;
-    case(2): (
+      case(2): (
        If(1=='1) Then 
             (
                int "CC":= 13
             ) 
        End) ; 
-    default : (bool "3" := true)
+      default : (bool "3" := true)
     );;
     unsigned "v"[50]={1; 2; 3} ;;
     while("a" <' 2)
